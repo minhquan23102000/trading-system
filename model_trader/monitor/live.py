@@ -1,10 +1,11 @@
 """Live monitor loop.
 
 Scans symbols, shows a dashboard, opens paper trades on TAKE signals.
-Optional agent layer can veto trades if configured.
+Supports single-scanner mode (default) and ensemble voting mode.
 
-Call `run_monitor(scanner, paper_trader, agent=None)` to start.
+Call `run_monitor(scanner, paper_trader, ensemble=None)` to start.
 """
+
 
 from __future__ import annotations
 
@@ -72,7 +73,7 @@ def _build_dashboard(results: list, scan_time: float, title: str) -> str:
 def run_monitor(
     scanner,
     paper_trader: PaperTrader,
-    agent=None,
+    ensemble=None,
     scan_interval: int = 60,
     fast_interval_when_open: int = 15,
     duplicate_lookback_min: int = 15,
@@ -83,9 +84,9 @@ def run_monitor(
     """Run the live scan-and-trade loop.
 
     Args:
-        scanner: Your ScannerBase subclass instance.
+        scanner: Your ScannerBase subclass instance (single-scanner mode).
         paper_trader: A PaperTrader instance (journal path + balance config).
-        agent: Optional agent object with .evaluate(setup, recent_trades) -> {decision, reasoning}.
+        ensemble: Optional EnsembleEngine instance for multi-scanner voting.
         scan_interval: Seconds between scans when idle.
         fast_interval_when_open: Seconds between scans when a trade is open.
         duplicate_lookback_min: Minutes to block re-entry on identical setup.
@@ -97,7 +98,8 @@ def run_monitor(
     print("=" * 60)
     print(f"  {title}")
     print(f"  Scanning {len(scanner.symbols)} symbols every {scan_interval}s")
-    print(f"  Agent: {'ON' if agent else 'OFF'}")
+    mode = "Ensemble" if ensemble else "Single-scanner"
+    print(f"  Mode: {mode}")
     print("  Press Ctrl+C to stop")
     print("=" * 60)
     print()
@@ -110,9 +112,19 @@ def run_monitor(
             # Close any hit stops/targets on open trades
             closed_this_cycle = paper_trader.check_exits()
 
-            # Evaluate setups
+            # Evaluate setups: ensemble mode or single-scanner mode
             try:
-                results = scanner.scan_all()
+                if ensemble:
+                    decisions = ensemble.scan_all()
+                    # Build dashboard from scanner results (not just decisions)
+                    results = [
+                        r
+                        for s in ensemble._scanners
+                        for r in s.last_results
+                    ]
+                else:
+                    results = scanner.scan_all()
+                    decisions = [r for r in results if r.status == SetupStatus.TAKE]
             except Exception as e:
                 print(f"Scan error: {e}", flush=True)
                 time.sleep(scan_interval)
@@ -121,11 +133,9 @@ def run_monitor(
             scan_time = time.time() - t0
             print(_build_dashboard(results, scan_time, title), flush=True)
 
-            # Execute any valid TAKE signals
+            # Execute valid TAKE decisions
             open_symbols = {t["symbol"] for t in paper_trader.get_open_trades()}
-            for r in results:
-                if r.status != SetupStatus.TAKE:
-                    continue
+            for r in decisions:
                 if r.symbol in open_symbols:
                     continue
                 if r.entry is None:
@@ -148,21 +158,6 @@ def run_monitor(
                     required_distance_pct=invalidated_distance_pct,
                 ):
                     continue
-
-                # Optional agent veto
-                if agent is not None:
-                    decision = agent.evaluate(r, paper_trader.get_all_trades())
-                    emoji = {"TAKE": ">>", "SKIP": "XX", "WAIT": "~~"}.get(
-                        decision["decision"], "??"
-                    )
-                    print(
-                        f"  [AGENT {emoji}] {r.symbol} {(r.direction or '').upper()} "
-                        f"({decision.get('confidence', '?')}): "
-                        f"{decision.get('reasoning', '')[:150]}",
-                        flush=True,
-                    )
-                    if decision["decision"] != "TAKE":
-                        continue
 
                 trade = paper_trader.execute(r)
                 if trade:

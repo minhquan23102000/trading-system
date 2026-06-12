@@ -158,18 +158,9 @@ def main():
         data_adapter=data,
     )
 
-    agent = None
-    if config.get("agent_enabled"):
-        from model_trader.agent import TraderAgent
-        agent = TraderAgent(
-            philosophy_path=HERE / "philosophy.md",
-            journal_path=HERE / "agent_journal.json",
-        )
-
     run_monitor(
         scanner=scanner,
         paper_trader=paper,
-        agent=agent,
         scan_interval=config.get("scan_interval_seconds", 60),
         title="{name} Live Monitor",
     )
@@ -238,20 +229,13 @@ def main():
     (target_dir / "main.py").write_text(MAIN_TEMPLATE.format(name=name), encoding="utf-8")
     (target_dir / "backtest.py").write_text(BACKTEST_TEMPLATE.format(name=name), encoding="utf-8")
 
-    # Copy philosophy template
-    template_path = Path("model_trader/agent/philosophy_template.md")
-    if template_path.exists():
-        (target_dir / "philosophy.md").write_text(
-            template_path.read_text(encoding="utf-8"), encoding="utf-8"
-        )
-
     print(f"Scaffolded {target_dir}\n")
     print("Next steps:")
-    print(f"  1. Fetch transcripts: python -m pipeline.fetch_youtube_transcripts {target_dir}/transcripts <video_ids...>")
-    print(f"  2. Extract strategy:  python -m pipeline.extract_strategy {target_dir}/transcripts {target_dir}")
-    print(f"  3. Implement scanner: {target_dir}/scanner.py (use strategy.md as reference)")
-    print(f"  4. Configure symbols: {target_dir}/config.yaml")
-    print(f"  5. Run:               cd {target_dir} && python main.py")
+    print(f"  1. Fetch transcripts: uv run python -m pipeline.fetch_youtube_transcripts {target_dir}/transcripts <video_ids...>")
+    print(f"  2. Extract strategy:  uv run python -m pipeline.extract_strategy {target_dir}/transcripts {target_dir}")
+    print(f"  3. Implement scanner:  edit {target_dir}/scanner.py (use strategy.md as reference)")
+    print(f"  4. Configure symbols:  edit {target_dir}/config.yaml")
+    print(f"  5. Run:                cd {target_dir} && uv run python main.py")
 
 
 if __name__ == "__main__":

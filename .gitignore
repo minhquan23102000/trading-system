@@ -13,7 +13,7 @@ env/
 
 # Trader-specific state — never commit
 traders/*/trades.json
-traders/*/agent_journal.json
+traders/*/ensemble.db
 traders/*/transcripts/
 traders/*/raw/
 
@@ -36,3 +36,4 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+.omc

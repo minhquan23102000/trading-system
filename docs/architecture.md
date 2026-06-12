@@ -14,17 +14,18 @@ you haven't — that document covers the workflow; this one covers the code.
             |  Scanner |   |  Filters |  |  PaperTrader |
             +------+---+   +----+-----+  +---+----------+
                    |            |            |
-                   |            +-----+      |
-                   |                  |      |
-                   v                  v      v
-                +--+------+      +----+------+--+
-                | Detectors|      |  Journal     |
-                +--+------+       |  (trades.json)|
-                   |              +--------------+
-                   v
-              +----+------+
-              | DataAdapter|
-              +-----------+
+                   |            +------+      |
+                   |                   |      |
+                   v                   v      v
+                +--+------+     +------+----+--+
+                | Detectors|     |  Ensemble    |
+                +--+------+     |  (optional)  |
+                   |            +--+---+---+---+
+                   v               |   |   |
+              +----+------+        v   v   v
+              | DataAdapter|     +--+---+---+--+
+              +-----------+      |  SQLite DB  |
+                                 +-------------+
 ```
 
 - **DataAdapter** is the bottom of the stack. Everything else asks it for
@@ -34,9 +35,9 @@ you haven't — that document covers the workflow; this one covers the code.
   `SetupResult`.
 - **PaperTrader** owns position state and the JSON journal.
 - **Filters** sit between the scanner and the trader. They reject `TAKE`
-  setups that look like duplicates or repeats of recently-blown levels.
 - **run_monitor** is the loop that ties it all together and renders the
-  dashboard. Optionally consults an **Agent** (Claude) before executing.
+  dashboard. Optionally uses an **Ensemble** engine for multi-scanner voting.
+
 
 Each layer depends only on the ones below it, so you can use any piece in
 isolation: a scanner without a trader (just to log signals), a paper trader
@@ -96,13 +97,13 @@ Once per `scan_interval` seconds, `run_monitor` does this:
 
 ```
 1. paper_trader.check_exits()              # close any TP/SL hits using 1m candles
-2. results = scanner.scan_all()            # call evaluate(symbol) for each symbol
+2. if ensemble: decisions = ensemble.scan_all()  # multi-scanner weighted vote
+   else: results = scanner.scan_all()            # single-scanner mode
 3. render_dashboard(results, journal)
-4. for r in results where r.status == TAKE:
+4. for r in decisions where r.status == TAKE:
        if open_trade_on(r.symbol):     skip
        if is_duplicate_setup(r):       skip   # same entry/sl/tp recently
        if is_invalidated_level(r):     skip   # similar setup just got stopped
-       if agent and agent.veto(r):     skip   # optional Claude veto
        paper_trader.open_trade(r)
 5. sleep(scan_interval or fast_interval if a trade is open)
 ```
@@ -136,8 +137,8 @@ reading from passed-in history instead of calling the data adapter). See
 
 - **`traders/<name>/trades.json`** — paper trader journal. The source of truth
   for everything that's been executed.
-- **`traders/<name>/agent_journal.json`** — agent decisions, when the agent
-  layer is enabled.
+- **`traders/<name>/ensemble.db`** — SQLite database for per-scanner trade
+  tracking and ensemble scoring.
 - **`traders/<name>/transcripts/`** — input to the extraction pipeline.
 - Everything else is recomputed per scan. There is no in-memory cache that
   would be lost on restart.

@@ -6,6 +6,15 @@ from .data import DataAdapter, HyperliquidAdapter
 from .gates import ScannerBase, SetupResult, SetupStatus
 from .paper_trader import PaperTrader
 from .monitor import run_monitor
+from .ensemble import (
+    EnsembleDB,
+    ScoreEngine,
+    DegradationDetector,
+    EnsembleEngine,
+    EnsembleConfig,
+    ScannerDef,
+    load_ensemble_config,
+)
 
 __all__ = [
     "DataAdapter",
@@ -15,4 +24,11 @@ __all__ = [
     "SetupStatus",
     "PaperTrader",
     "run_monitor",
+    "EnsembleDB",
+    "ScoreEngine",
+    "DegradationDetector",
+    "EnsembleEngine",
+    "EnsembleConfig",
+    "ScannerDef",
+    "load_ensemble_config",
 ]

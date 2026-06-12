@@ -26,7 +26,7 @@ plain `.txt` files into `traders/<name>/transcripts/` directly — the next stag
 just reads every `.txt` it finds.
 
 ```bash
-python -m pipeline.fetch_youtube_transcripts traders/my_trader/transcripts \
+python -m pipeline.scripts.fetch_youtube_transcripts traders/my_trader/transcripts \
     VIDEO_ID_1 VIDEO_ID_2 VIDEO_ID_3
 ```
 
@@ -41,23 +41,27 @@ video.
 ## 2. Extract
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-python -m pipeline.extract_strategy traders/my_trader/transcripts traders/my_trader
+python -m pipeline.scripts.extract_strategy traders/my_trader/transcripts traders/my_trader
+
 ```
 
-This runs Claude Opus 4.6 in two passes against the full transcript corpus:
+This aggregates all transcripts into `_extraction_context.md` — a single file
+containing the full transcript corpus plus extraction instructions. No API key
+is needed for this step.
 
-- **Pass 1 -> `strategy.md`** — a structured breakdown: core identity, ranked
-  priorities, every distinct setup, key concepts, a draft list of gates,
-  anti-patterns, risk management, and characteristic vocabulary. This is your
-  reference document while implementing the scanner.
+**Then, ask your AI assistant to process it:**
 
-- **Pass 2 -> `philosophy_draft.md`** — a 2-4k word document written in the
-  trader's voice, structured as a system prompt for the optional agent layer.
-  You'll edit this by hand before using it.
+> Read `traders/my_trader/_extraction_context.md` and follow the extraction
+> workflow in `pipeline/SKILL.md`. Produce `strategy.md` and
+> `philosophy_draft.md`.
 
-**Read both documents before writing any code.** If the strategy doc is vague
-in places (it usually is — traders contradict themselves, or leave the most
+The AI produces both documents in-chat by reading the transcripts directly.
+This replaces the previous Claude API approach — same quality extraction,
+zero API cost, and you can steer the output interactively.
+
+The SKILL.md (`pipeline/SKILL.md`) defines the full workflow: extract strategy
+→ implement gates → backtest → iterate. The AI follows it end-to-end.
+
 important parts unsaid), that vagueness is going to show up as ambiguity in
 your gate definitions. Better to notice it now and resolve it deliberately
 than to discover it three days into a backtest.
@@ -65,7 +69,7 @@ than to discover it three days into a backtest.
 ## 3. Scaffold
 
 ```bash
-python -m pipeline.scaffold_trader my_trader
+python -m pipeline.scripts.scaffold_trader my_trader
 ```
 
 Creates `traders/my_trader/` with:
@@ -74,7 +78,8 @@ Creates `traders/my_trader/` with:
 - `config.yaml` — symbols, timeframes, correlations, paper trading settings
 - `main.py` — entry point that wires the scanner into the live monitor
 - `backtest.py` — entry point that runs the scanner against historical data
-- `philosophy.md` — copy of the agent template (only used if `agent_enabled: true`)
+- `philosophy.md` — copy of the trader voice template (reference only)
+
 - `transcripts/` — empty, ready for stage 1
 
 If you ran stage 1 first, the transcripts directory will already have content;
@@ -143,9 +148,10 @@ The live monitor will:
 1. Check open trades against current 1m candles (SL/TP)
 2. Scan all configured symbols
 3. Print a dashboard
-4. For each `TAKE` setup: skip if already open on this symbol, skip if
+4. For each `TAKE` decision: skip if already open on this symbol, skip if
    duplicate of a recent trade, skip if a structurally-similar setup just
-   got stopped out, optionally consult the agent, then execute
+   got stopped out, then execute
+
 5. Sleep `scan_interval` seconds (faster when a trade is open, to catch exits)
 
 All trades land in `trades.json` in the trader's directory. That file is the
@@ -164,7 +170,7 @@ A working trader project, after a few rounds of iteration, ends up with:
 - A `strategy.md` you've annotated with notes on which rules turned out to
   matter and which were just vibes
 - A `trades.json` with enough samples (50+) to actually evaluate
-- An optional `philosophy.md` that the agent uses to veto setups your gates
-  would otherwise take
+- An optional `philosophy.md` as a reference for how the trader thinks
 
-You don't need the agent layer to ship. Most of the edge is in the gates.
+
+

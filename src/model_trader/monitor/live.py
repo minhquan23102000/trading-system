@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone
 
 from ..gates import SetupStatus
-from ..paper_trader import (
+from ..trading import (
     PaperTrader,
     is_duplicate_setup,
     is_invalidated_level,

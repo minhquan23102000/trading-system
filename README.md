@@ -28,8 +28,9 @@ It is not a strategy. It is the harness around one.
   - `data/` — `DataAdapter` ABC + `HyperliquidAdapter` (works with no API key)
   - `detectors/` — reusable pattern detectors (FVG, swings, CISD, SMT, displacement, failure swings)
   - `gates/` — `ScannerBase` and the `SetupResult` / `SetupStatus` types
-  - `paper_trader/` — JSON-journaled paper trader with leverage cap, duplicate
-    filter, structural invalidated-level filter, and metrics
+  - `trading/` — JSON-journaled paper trader and live executors (e.g.
+    Hyperliquid) sharing position-sizing/PnL math, plus duplicate and
+    invalidated-level filters and metrics
   - `monitor/` — live monitor loop (scan → filter → execute → dashboard)
   - `backtest/` — historical runner that walks a scanner through past candles
   - `ensemble/` — champion-challenger weighted voting engine

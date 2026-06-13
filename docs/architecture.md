@@ -109,7 +109,7 @@ Once per `scan_interval` seconds, `run_monitor` does this:
 ```
 
 The two filters (`is_duplicate_setup`, `is_invalidated_level`) live in
-`model_trader.paper_trader.filters` and exist because of two failure modes that
+`model_trader.trading.filters` and exist because of two failure modes that
 showed up empirically: scanners that re-trigger on the same bar produce
 duplicate trades; scanners that re-trigger after getting stopped at a level
 will keep blowing up on that same level until the level structurally

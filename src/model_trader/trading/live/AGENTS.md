@@ -1,7 +1,7 @@
 <!-- Parent: ../AGENTS.md -->
 <!-- Generated: 2026-06-13 | Updated: 2026-06-13 -->
 
-# executor
+# trading.live
 
 ## Purpose
 
@@ -30,6 +30,7 @@ None.
 - **Testnet-first**: Default to testnet; pass `testnet=False` for mainnet. Never hardcode a mainnet key; always use env vars.
 - **Size and price rounding**: Hyperliquid has specific rounding rules (max 5 significant figures for prices, size decimals per asset). Executor handles this transparently.
 - **Multi-dex support**: Hyperliquid supports builder-deployed synth perps (e.g., "xyz:GOLD") on separate margin accounts. Executor discovers all dexes at init and queries the correct account per coin.
+- **Shared sizing/PnL math**: Position sizing (`size_with_leverage_cap`) and close accounting (`apply_close`) come from `..journal` (`model_trader.trading.journal`) — the same functions `PaperTrader` uses. Don't re-derive this math locally; fix it in `..journal` so paper and live stay in sync.
 
 #### HyperliquidExecutor public API
 
@@ -47,14 +48,14 @@ HyperliquidExecutor(
 **Methods:**
 
 - **`execute(setup: dict) -> dict | None`** — Open a trade from a TAKE `SetupResult`. Expects keys: `status`, `symbol`, `direction`, `entry`, `stop`, `target`. Returns the journal entry dict (with `id`, `entry_oid`, `sl_oid`, `tp_oid`, `status`, `fill_time`, etc.) or `None` if rejected.
-  - Validates setup completeness and calculates position size from risk budget.
+  - Validates setup completeness and calculates position size from risk budget via `..journal.size_with_leverage_cap()`.
   - Caps position via `max_leverage` to prevent over-leveraging.
   - Places three orders atomically: entry limit, TP trigger, SL trigger (grouped as `normalTpsl`).
   - Journal entry is marked `PENDING` until entry fills, then `OPEN`.
 
 - **`check_exits() -> list[dict]`** — Reconcile open trades against exchange state (open orders, positions, fills). Called periodically by the monitor loop or your main script.
   - Marks `PENDING` trades as `OPEN` once entry fills, or `CANCELLED` if the entry order was rejected.
-  - Marks `OPEN` trades as `CLOSED` when no position remains (TP or SL triggered, or manual close).
+  - Marks `OPEN` trades as `CLOSED` (via `..journal.apply_close()`) when no position remains (TP or SL triggered, or manual close).
   - Queries all registered dexes (native perp + builder perps) to handle multi-account portfolios.
   - Returns the list of newly-closed trades.
 
@@ -109,7 +110,7 @@ No dedicated test file. Manual integration testing via:
 **Setting up the executor for a trader's main.py:**
 
 ```python
-from model_trader.executor import HyperliquidExecutor
+from model_trader.trading.live import HyperliquidExecutor
 from model_trader import run_monitor
 
 executor = HyperliquidExecutor(
@@ -197,22 +198,22 @@ The core `model_trader` framework (described in `docs/architecture.md`) is **pap
 
 `HyperliquidExecutor` is a **separate, optional module** that traders use when they are ready to go live. It:
 
-- Does **not** integrate with `PaperTrader` or `run_monitor` directly. Traders must call `executor.execute()` manually or add it to their custom loop.
+- Does **not** integrate with `PaperTrader` or `run_monitor` directly. Traders must call `executor.execute()` manually or add it to their custom loop, or pass it as `trader` to `PortfolioOrchestrator`.
 - Maintains its **own journal** so it doesn't interfere with paper trading.
 - Can run **in parallel with paper trading** (useful for comparison) or **instead of it** (live-only).
-- Is **not required** to use the framework — traders can keep trading paper indefinitely, or write their own `LiveTrader` class for a different exchange.
+- Shares position-sizing and close/PnL math with `PaperTrader` via `..journal` (`model_trader.trading.journal`) — only persistence (its own journal) and order placement are exchange-specific.
+- Is **not required** to use the framework — traders can keep trading paper indefinitely, or write their own live executor for a different exchange that satisfies the `..journal.Trader` protocol.
 
 ### Why are they separate?
 
 1. **Dependency isolation**: Not every trader goes live. Keeping the SDK import lazy (via `__getattr__`) avoids bloating the main package.
 2. **Safety**: Accidental confusion between paper and live state is minimized when they have separate journals and explicit control flow.
-3. **Modularity**: Other exchanges can be added (e.g., `BinanceExecutor`, `DydxExecutor`) without changing the paper trader or monitor.
+3. **Modularity**: Other exchanges can be added (e.g., `BinanceExecutor`, `DydxExecutor`) without changing the paper trader or monitor — each new executor implements the same `..journal.Trader` protocol and reuses `..journal`'s sizing/close helpers.
 
 ## Dependencies
 
 ### Internal
-
-None (self-contained; no upward deps into monitor, paper_trader, or gates).
+- `..journal` (`model_trader.trading.journal`): `load_journal`, `save_journal`, `size_with_leverage_cap`, `apply_close`, `Trader` protocol.
 
 ### External
 

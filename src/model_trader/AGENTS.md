@@ -23,11 +23,10 @@ runner, and the ensemble voting engine. See `docs/architecture.md` for the layer
 | `data/` | `DataAdapter` ABC + `HyperliquidAdapter` — candle fetching (see `data/AGENTS.md`) |
 | `detectors/` | Pure-function pattern detectors: FVG, swings, CISD, SMT, displacement, failure swings (see `detectors/AGENTS.md`) |
 | `gates/` | `ScannerBase` and the `SetupResult`/`SetupStatus` types every scanner is built from (see `gates/AGENTS.md`) |
-| `paper_trader/` | JSON-journaled paper trader, duplicate/invalidated-level filters, metrics (see `paper_trader/AGENTS.md`) |
+| `trading/` | JSON-journaled paper trader, shared sizing/PnL journal math, duplicate/invalidated-level filters, metrics, and live executors (see `trading/AGENTS.md`) |
 | `monitor/` | Live monitor loop: scan → filter → execute → dashboard (see `monitor/AGENTS.md`) |
 | `backtest/` | Historical runner that walks a scanner through past candles (see `backtest/AGENTS.md`) |
 | `ensemble/` | Champion/challenger weighted-voting engine with SQLite-backed scoring (see `ensemble/AGENTS.md`) |
-| `executor/` | Order execution interfaces, incl. Hyperliquid (see `executor/AGENTS.md`) |
 
 ## For AI Agents
 

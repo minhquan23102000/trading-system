@@ -10,7 +10,7 @@ Call `check_exits()` periodically to reconcile the journal against
 `info.user_state()` and `info.user_fills()`.
 
 Usage:
-    from model_trader.executor import HyperliquidExecutor
+    from model_trader.trading.live import HyperliquidExecutor
 
     ex = HyperliquidExecutor(
         journal_path="trades.json",
@@ -25,12 +25,13 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import math
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from ..journal import apply_close, load_journal, save_journal, size_with_leverage_cap
 
 
 class HyperliquidExecutor:
@@ -86,15 +87,10 @@ class HyperliquidExecutor:
     # ---------- Persistence ----------
 
     def _load(self) -> list[dict]:
-        if self.journal_path.exists():
-            with open(self.journal_path, encoding="utf-8") as f:
-                return json.load(f)
-        return []
+        return load_journal(self.journal_path)
 
     def _save(self, trades: list[dict]) -> None:
-        self.journal_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.journal_path, "w", encoding="utf-8") as f:
-            json.dump(trades, f, indent=2, default=str)
+        save_journal(self.journal_path, trades)
 
     def get_open_trades(self) -> list[dict]:
         return [t for t in self._load() if t.get("status") in ("OPEN", "PENDING")]
@@ -203,15 +199,7 @@ class HyperliquidExecutor:
                 f"No margin in the '{self._dex_for_coin(coin) or 'default'}' "
                 f"dex account. Transfer USDC into it before trading {coin}."
             )
-        pct = setup.get("risk_pct", self.per_trade_pct)
-        risk = balance * (pct / 100)
-        size = risk / stop_dist
-
-        notional = size * entry
-        max_notional = balance * self.max_leverage
-        if notional > max_notional:
-            size = max_notional / entry
-            risk = size * stop_dist
+        size, risk = size_with_leverage_cap(balance, pct, entry, stop_dist, self.max_leverage)
 
         size = self._round_size(coin, size)
         if size <= 0:
@@ -382,7 +370,7 @@ class HyperliquidExecutor:
                     exit_px = float(t["entry_price"])
                     exit_time = datetime.now(timezone.utc).isoformat()
 
-                _apply_close(t, reason, exit_px, exit_time)
+                apply_close(t, reason, exit_px, exit_time)
                 newly_closed.append(t)
                 changed = True
 
@@ -426,31 +414,3 @@ def _latest_close_fill(fills: list[dict], coin: str) -> dict | None:
 
 def _ms_to_iso(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
-
-
-def _apply_close(trade: dict, reason: str, exit_price: float, exit_time: str) -> None:
-    trade["status"] = "CLOSED"
-    trade["exit_time"] = exit_time
-    trade["exit_price"] = exit_price
-
-    if trade["direction"] == "long":
-        trade["pnl"] = (exit_price - trade["entry_price"]) * trade["position_size"]
-    else:
-        trade["pnl"] = (trade["entry_price"] - exit_price) * trade["position_size"]
-
-    stop_dist = abs(trade["entry_price"] - trade["stop_loss"])
-    if stop_dist > 0:
-        trade["r_multiple"] = round(
-            trade["pnl"] / (trade["position_size"] * stop_dist), 2
-        )
-    else:
-        trade["r_multiple"] = 0
-
-    if trade["pnl"] > 0:
-        trade["outcome"] = "WIN"
-    elif trade["pnl"] < 0:
-        trade["outcome"] = "LOSS"
-    else:
-        trade["outcome"] = "BE"
-
-    trade["notes"] = reason

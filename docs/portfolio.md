@@ -115,7 +115,7 @@ export HL_PRIVATE_KEY=0x...     # API wallet private key (trade permission only)
 
 ## Paper → Live Cutover
 
-Flip `paper_trading: false` in the relevant trader config. The orchestrator, scanners, and sizing functions are unchanged — they operate on `SetupResult` objects and the JSON journal regardless of executor. `HyperliquidExecutor` (`src/model_trader/executor/hyperliquid.py`) accepts the same `SetupResult` interface as `PaperTrader`. On entry, it places exchange-side SL and TP trigger orders so exits fire on Hyperliquid even if the bot goes offline. The journal gains exchange-specific fields (`entry_oid`, `sl_oid`, `tp_oid`, `fill_time`) but remains structurally compatible with the composite scoring logic.
+Flip `paper_trading: false` in the relevant trader config. The orchestrator, scanners, and sizing functions are unchanged — they operate on `SetupResult` objects and the JSON journal regardless of executor. `HyperliquidExecutor` (`src/model_trader/trading/live/hyperliquid.py`) accepts the same `SetupResult` interface as `PaperTrader`. On entry, it places exchange-side SL and TP trigger orders so exits fire on Hyperliquid even if the bot goes offline. The journal gains exchange-specific fields (`entry_oid`, `sl_oid`, `tp_oid`, `fill_time`) but remains structurally compatible with the composite scoring logic.
 
 ---
 

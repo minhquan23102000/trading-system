@@ -66,7 +66,7 @@ def main() -> None:
             data_adapter=data,
         )
     else:
-        from model_trader.executor import HyperliquidExecutor  # noqa: PLC0415
+        from model_trader.trading.live import HyperliquidExecutor  # noqa: PLC0415
 
         trader = HyperliquidExecutor(
             journal_path=journal,

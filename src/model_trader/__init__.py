@@ -19,7 +19,7 @@ from .detectors import (
     detect_displacement,
 )
 from .gates import ScannerBase, SetupResult, SetupStatus
-from .paper_trader import PaperTrader
+from .trading import PaperTrader, Trader
 from .monitor import run_monitor
 from .portfolio import PortfolioOrchestrator
 from .ensemble import (
@@ -49,6 +49,7 @@ __all__ = [
     "ScannerDef",
     "load_ensemble_config",
     "Detector",
+    "Trader",
     "SwingDetector",
     "FVGDetector",
     "FailureSwingDetector",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..gates import ScannerBase, SetupResult, SetupStatus
+from ..trading import Trader
 from .sizing import (
     composite_from_journal,
     compute_weights,
@@ -45,7 +46,7 @@ class PortfolioOrchestrator:
     def __init__(
         self,
         scanners: dict[str, ScannerBase],
-        trader,
+        trader: Trader,
         starting_balance: float = 100_000.0,
         window_days: int = 90,
         min_trades: int = 10,

@@ -1,7 +1,7 @@
 """Live execution engines.
 
 Implementations that place real orders on real exchanges. Import the one
-you need — the top-level `__init__` does not import them eagerly so that
+you need — this package does not import them eagerly so that
 `model_trader` itself has no hard dependency on exchange SDKs.
 """
 

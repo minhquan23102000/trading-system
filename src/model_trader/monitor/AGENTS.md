@@ -135,7 +135,7 @@ See `docs/ensemble.md` for detailed ensemble design and configuration.
 ### Internal
 
 - `gates` — `SetupStatus` enum (NO_SETUP, SKIP, WAIT, TAKE).
-- `paper_trader` — `PaperTrader` class, `is_duplicate_setup()`, `is_invalidated_level()`, `calculate_metrics()` functions.
+- `trading` — `PaperTrader` class, `is_duplicate_setup()`, `is_invalidated_level()`, `calculate_metrics()` functions.
 - `ensemble` (optional) — `EnsembleEngine` for multi-scanner voting mode.
 
 ### External

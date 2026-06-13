@@ -35,9 +35,17 @@ from __future__ import annotations
 
 from model_trader.gates import ScannerBase, SetupResult, SetupStatus
 from model_trader.detectors import (
+    # Class-based (recommended — configure once, reuse):
+    SwingDetector,
+    FVGDetector,
+    FailureSwingDetector,
+    CISDDetector,
+    SMTDetector,
+    DisplacementDetector,
+    # Legacy functions (still work for quick one-offs):
     detect_swings,
-    detect_failure_swings,
     detect_fvg,
+    detect_failure_swings,
     detect_cisd,
     detect_smt,
     detect_displacement,
@@ -62,8 +70,17 @@ class Scanner(ScannerBase):
         # ===== GATE 1: [name] =====
         # TODO: implement first gate. Example patterns:
         #
-        #   swings = detect_swings(data["1h"][-50:])
-        #   failure_swings = detect_failure_swings(swings)
+        #   # Class-based (configure once in __init__):
+        #   swing_detector = SwingDetector(lookback=5)
+        #   swings = swing_detector.detect(data["1h"][-50:])
+        #   # or: swings = swing_detector(data["1h"][-50:])
+        #
+        #   fvg_detector = FVGDetector()
+        #   fvgs = fvg_detector.detect(data["1h"][-50:])
+        #
+        #   fail_detector = FailureSwingDetector(tolerance_pct=0.1)
+        #   failure_swings = fail_detector.detect(swings)
+        #
         #   if not failure_swings:
         #       result.reason = "No failure swings"
         #       return result

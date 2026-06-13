@@ -15,9 +15,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = ["pytest>=8.0"]
 pipeline = ["yt-dlp>=2024.1.0"]
 live = ["hyperliquid-python-sdk>=0.9"]
 all = ["yt-dlp>=2024.1.0", "hyperliquid-python-sdk>=0.9"]
 
 [tool.setuptools.packages.find]
-include = ["model_trader*", "pipeline*"]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

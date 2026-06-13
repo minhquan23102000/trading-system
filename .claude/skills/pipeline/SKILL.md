@@ -15,7 +15,7 @@ triggers:
 # Trade Setup Scanner (model-trader)
 
 Turn a trader's transcripts into an executable gate-based scanner + paper-trading
-bot under `traders/<name>/`. The framework (`model_trader/`) provides detectors,
+bot under `traders/<name>/`. The framework (`src/model_trader/`) provides detectors,
 gate infrastructure, paper trading, ensemble voting, and a live monitor — your
 job is to translate the trader's thinking into pass/fail gates and validate them
 against history.
@@ -159,22 +159,23 @@ clobber in-progress work.
 
 ### Step 3.1: Learn the available detectors
 
-These are pure functions in `model_trader/detectors/` — no side effects,
-operate on candle dicts:
+Detectors live in `src/model_trader/detectors/`. Each has a **class** (recommended —
+configure once, call `detect()`) and a **legacy function** wrapper:
 
-| Function | Input | Returns | Purpose |
-|----------|-------|---------|---------|
-| `detect_swings` | `candles` | `list[Swing]` | pivot highs/lows |
-| `detect_failure_swings` | `swings` | `list[FailureSwing]` | failed break attempts |
-| `detect_fvg` | `candles, direction=None` | `list[FVG]` | fair value gaps |
-| `update_fvg_states` | `fvgs, candles` | — | mark FVGs touched/filled |
-| `detect_cisd` | `candles` | `list[CISDSignal]` | change in delivery |
-| `detect_cisd_breaker` | `CISDSignals` | `list[Breaker]` | breakers of CISD |
-| `detect_smt` | `primary_candles, correlated_candles` | `list[SMTSignal]` | SMT divergence |
-| `detect_displacement` | `candles` | `list[Displacement]` | strong directional moves |
+| Class | Function | Input | Returns |
+|-------|----------|-------|---------|
+| `SwingDetector(lookback=3)` | `detect_swings(candles, lookback)` | `candles` | `list[Swing]` — pivot highs/lows |
+| `FVGDetector()` | `detect_fvg(candles)` | `candles` | `list[FVG]` — fair value gaps |
+| — | `update_fvg_states(fvgs, candles)` | fvgs + candles | mutates in place — mark filled/inversed/respected |
+| `FailureSwingDetector(tolerance_pct=0.1)` | `detect_failure_swings(swings, tolerance_pct)` | `swings` | `list[FailureSwing]` — failed break clusters |
+| `CISDDetector()` | `detect_cisd(candles, swings)` | candles + swings | `list[CISDSignal]` — structure shift |
+| — | `detect_cisd_breaker(candles, cisd_signal)` | candles + single signal | `Breaker \| None` — breaker candle |
+| `SMTDetector()` | `detect_smt(a1_swings, a2_swings)` | two swing lists | `list[SMTSignal]` — divergence |
+| `DisplacementDetector(lookback=5, threshold=2.0)` | `detect_displacement(candles, lookback, threshold)` | `candles` | `list[Displacement]` — giant moves |
 
-Read the detector source for exact argument shapes if unsure.
-
+All classes inherit from `Detector` (ABC) and expose a `name` class attribute.
+Both `detector.detect(args)` and `detector(args)` work. Read the detector source
+for exact shapes.
 ### Step 3.2: Understand the ScannerBase
 
 ```python
@@ -203,12 +204,16 @@ class ScannerBase(ABC):
 
 ### Step 3.3: Translate strategy.md gates into code
 
-Subclass `ScannerBase` in `traders/<name>/scanner.py`. Write gates as inline
-pass/fail blocks inside `evaluate()` — there is no Gate class:
-
 ```python
 from model_trader.gates import ScannerBase, SetupResult, SetupStatus
-from model_trader.detectors import detect_swings, detect_fvg, ...
+from model_trader.detectors import (
+    SwingDetector,
+    FVGDetector,
+    FailureSwingDetector,
+    CISDDetector,
+    SMTDetector,
+    DisplacementDetector,
+)
 
 class Scanner(ScannerBase):
     def evaluate(self, symbol: str) -> SetupResult:
@@ -216,7 +221,13 @@ class Scanner(ScannerBase):
         data = self.fetch_data(symbol)
         corr_data = self.fetch_correlation(symbol, ["1h", "15m"])
 
+        # Configure detectors once (or at __init__), reuse per symbol:
+        swing = SwingDetector(lookback=3)
+        fvg = FVGDetector()
+
         # GATE 1: [name] — [what it checks]
+        swings = swing.detect(data["1h"][-50:])
+        fvgs = fvg.detect(data["1h"][-50:])
         if not some_condition:
             result.reason = "specific reason — shows in dashboard/journal"
             return result

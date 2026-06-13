@@ -6,6 +6,7 @@ Also detects the "breaker" candle that forms after CISD.
 
 from __future__ import annotations
 from typing import TypedDict
+from .base import Detector
 
 
 class CISDSignal(TypedDict):
@@ -20,37 +21,43 @@ class Breaker(TypedDict):
     low: float
     index: int
 
+class CISDDetector(Detector):
+    name = "cisd"
+
+    def detect(self, candles: list[dict], swings: list[dict]) -> list[CISDSignal]:
+        signals: list[CISDSignal] = []
+        current_price = candles[-1]["close"]
+
+        recent_lows = [s for s in swings if s["type"] == "low"][-3:]
+        recent_highs = [s for s in swings if s["type"] == "high"][-3:]
+
+        for swing in recent_lows:
+            if current_price < swing["price"]:
+                signals.append(
+                    CISDSignal(
+                        type="bearish",
+                        broken_level=swing["price"],
+                        swing_index=swing["index"],
+                    )
+                )
+                break
+
+        for swing in recent_highs:
+            if current_price > swing["price"]:
+                signals.append(
+                    CISDSignal(
+                        type="bullish",
+                        broken_level=swing["price"],
+                        swing_index=swing["index"],
+                    )
+                )
+                break
+
+        return signals
+
 
 def detect_cisd(candles: list[dict], swings: list[dict]) -> list[CISDSignal]:
-    signals: list[CISDSignal] = []
-    current_price = candles[-1]["close"]
-
-    recent_lows = [s for s in swings if s["type"] == "low"][-3:]
-    recent_highs = [s for s in swings if s["type"] == "high"][-3:]
-
-    for swing in recent_lows:
-        if current_price < swing["price"]:
-            signals.append(
-                CISDSignal(
-                    type="bearish",
-                    broken_level=swing["price"],
-                    swing_index=swing["index"],
-                )
-            )
-            break
-
-    for swing in recent_highs:
-        if current_price > swing["price"]:
-            signals.append(
-                CISDSignal(
-                    type="bullish",
-                    broken_level=swing["price"],
-                    swing_index=swing["index"],
-                )
-            )
-            break
-
-    return signals
+    return CISDDetector().detect(candles, swings)
 
 
 def detect_cisd_breaker(

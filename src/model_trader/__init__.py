@@ -21,6 +21,7 @@ from .detectors import (
 from .gates import ScannerBase, SetupResult, SetupStatus
 from .paper_trader import PaperTrader
 from .monitor import run_monitor
+from .portfolio import PortfolioOrchestrator
 from .ensemble import (
     EnsembleDB,
     ScoreEngine,
@@ -39,6 +40,7 @@ __all__ = [
     "SetupStatus",
     "PaperTrader",
     "run_monitor",
+    "PortfolioOrchestrator",
     "EnsembleDB",
     "ScoreEngine",
     "DegradationDetector",

@@ -110,7 +110,8 @@ class PaperTrader:
         rr = target_dist / stop_dist
 
         balance = self.get_balance()
-        risk = balance * (self.per_trade_pct / 100)
+        pct = setup.extras.get("risk_pct", self.per_trade_pct)
+        risk = balance * (pct / 100)
         size = risk / stop_dist
 
         # Leverage cap

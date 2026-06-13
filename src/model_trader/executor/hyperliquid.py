@@ -161,12 +161,26 @@ class HyperliquidExecutor:
 
     # ---------- Entry ----------
 
-    def execute(self, setup: dict) -> dict | None:
-        """Open a trade from a TAKE setup dict. Returns the journal entry or None.
+    def execute(self, setup) -> dict | None:
+        """Open a trade from a TAKE SetupResult or dict. Returns the journal entry or None.
 
-        Expected keys: status, symbol, direction, entry, stop, target.
-        Any other keys are preserved in `extras`.
+        Accepts both a SetupResult object and a plain dict with keys:
+        status, symbol, direction, entry, stop, target.
+        Any other keys/extras are preserved in the journal entry.
         """
+        # Normalise SetupResult -> dict so the rest of the method is unchanged
+        if hasattr(setup, "status"):
+            status_val = setup.status.value if hasattr(setup.status, "value") else str(setup.status)
+            extras = dict(setup.extras) if setup.extras else {}
+            setup = {
+                "status": status_val,
+                "symbol": setup.symbol,
+                "direction": setup.direction,
+                "entry": setup.entry,
+                "stop": setup.stop,
+                "target": setup.target,
+                **extras,
+            }
         if setup.get("status") != "TAKE":
             return None
 
@@ -189,7 +203,8 @@ class HyperliquidExecutor:
                 f"No margin in the '{self._dex_for_coin(coin) or 'default'}' "
                 f"dex account. Transfer USDC into it before trading {coin}."
             )
-        risk = balance * (self.per_trade_pct / 100)
+        pct = setup.get("risk_pct", self.per_trade_pct)
+        risk = balance * (pct / 100)
         size = risk / stop_dist
 
         notional = size * entry

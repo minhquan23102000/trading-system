@@ -74,6 +74,7 @@ def run_monitor(
     scanner,
     paper_trader: PaperTrader,
     ensemble=None,
+    portfolio=None,
     scan_interval: int = 60,
     fast_interval_when_open: int = 15,
     duplicate_lookback_min: int = 15,
@@ -87,6 +88,8 @@ def run_monitor(
         scanner: Your ScannerBase subclass instance (single-scanner mode).
         paper_trader: A PaperTrader instance (journal path + balance config).
         ensemble: Optional EnsembleEngine instance for multi-scanner voting.
+        portfolio: Optional PortfolioOrchestrator instance. When set, scanner
+            must be None. Takes precedence over ensemble.
         scan_interval: Seconds between scans when idle.
         fast_interval_when_open: Seconds between scans when a trade is open.
         duplicate_lookback_min: Minutes to block re-entry on identical setup.
@@ -97,8 +100,12 @@ def run_monitor(
     print()
     print("=" * 60)
     print(f"  {title}")
-    print(f"  Scanning {len(scanner.symbols)} symbols every {scan_interval}s")
-    mode = "Ensemble" if ensemble else "Single-scanner"
+    if portfolio:
+        n_sym = sum(len(s.symbols) for s in portfolio.scanners.values())
+        print(f"  Scanning {n_sym} symbols across {len(portfolio.scanners)} traders every {scan_interval}s")
+    else:
+        print(f"  Scanning {len(scanner.symbols)} symbols every {scan_interval}s")
+    mode = "Portfolio" if portfolio else ("Ensemble" if ensemble else "Single-scanner")
     print(f"  Mode: {mode}")
     print("  Press Ctrl+C to stop")
     print("=" * 60)
@@ -114,7 +121,10 @@ def run_monitor(
 
             # Evaluate setups: ensemble mode or single-scanner mode
             try:
-                if ensemble:
+                if portfolio:
+                    decisions = portfolio.scan_cycle()
+                    results = portfolio.last_results
+                elif ensemble:
                     decisions = ensemble.scan_all()
                     # Build dashboard from scanner results (not just decisions)
                     results = [

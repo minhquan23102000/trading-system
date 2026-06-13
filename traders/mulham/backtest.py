@@ -12,6 +12,7 @@ import yaml
 
 from model_trader import HyperliquidAdapter
 from model_trader.backtest import run_backtest
+from model_trader.logging import logger
 
 from scanner import Scanner
 
@@ -30,16 +31,16 @@ def main():
         days=52,
         step_timeframe="15m",
     )
-    print(f"\nTotal: {results['total_trades']} trades")
-    print(f"W/L: {results['wins']}/{results['losses']} "
+    logger.info(f"Total: {results['total_trades']} trades")
+    logger.info(f"W/L: {results['wins']}/{results['losses']} "
           f"({results['win_rate']}% WR)")
-    print(f"Total R: {results['total_r']}")
-    print(f"Avg R: {results['avg_r']}")
-    print(f"Profit factor: {results['profit_factor']}")
+    logger.info(f"Total R: {results['total_r']}")
+    logger.info(f"Avg R: {results['avg_r']}")
+    logger.info(f"Profit factor: {results['profit_factor']}")
 
-    print("\nPer-symbol R:")
+    logger.info("Per-symbol R:")
     for sym, stats in results.get("per_symbol", {}).items():
-        print(f"  {sym}: {stats['trades']} trades ({stats['wins']}W/{stats['losses']}L), R={stats['total_r']}")
+        logger.info(f"  {sym}: {stats['trades']} trades ({stats['wins']}W/{stats['losses']}L), R={stats['total_r']}")
 
 
 if __name__ == "__main__":

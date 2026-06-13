@@ -19,6 +19,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Callable, Any
 
 from ..gates import SetupStatus, SetupResult
+from ..logging import logger
 
 
 @dataclass
@@ -88,7 +89,7 @@ def _run_backtest_single(
                 hist[tf] = data_adapter.fetch_historical(symbol, tf, days)
             except Exception as e:
                 hist[tf] = []
-                print(f"  [{symbol} {tf}] fetch failed: {e}")
+                logger.warning(f"[{symbol} {tf}] fetch failed: {e}")
 
         # Correlation data
         corr_hist: dict[str, list] = {}
@@ -102,7 +103,7 @@ def _run_backtest_single(
 
         step_candles = hist.get(step_timeframe, [])
         if not step_candles:
-            print(f"  [{symbol}] no {step_timeframe} data, skipping")
+            logger.warning(f"[{symbol}] no {step_timeframe} data, skipping")
             continue
 
         trades_for_symbol: list[BacktestTrade] = []
@@ -192,7 +193,7 @@ def _run_backtest_single(
             "losses": losses,
             "total_r": sum(t.pnl_r for t in trades_for_symbol),
         }
-        print(f"  {symbol}: {len(trades_for_symbol)} trades (W={wins} L={losses})")
+        logger.info(f"{symbol}: {len(trades_for_symbol)} trades (W={wins} L={losses})")
 
     closed = [t for t in all_trades if t.outcome in ("WIN", "LOSS")]
     wins = [t for t in closed if t.outcome == "WIN"]
@@ -394,11 +395,11 @@ def _run_backtest_ensemble(
     }
 
     # Print per-scanner comparison
-    print(f"\n  Ensemble backtest summary:")
-    print(f"  Ensemble PF:   {result['profit_factor']}")
+    logger.info("Ensemble backtest summary:")
+    logger.info(f"Ensemble PF:   {result['profit_factor']}")
     for sid, stats in result["per_scanner"].items():
         if stats["trades"] > 0:
-            print(f"  {sid:12s} {stats['trades']:3d} trades  "
+            logger.info(f"  {sid:12s} {stats['trades']:3d} trades  "
                   f"W={stats['wins']} L={stats['losses']}")
 
     return result

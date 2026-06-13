@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..gates import ScannerBase, SetupResult, SetupStatus
+from ..logging import logger
 from ..trading import Trader
 from .sizing import (
     composite_from_journal,
@@ -95,7 +96,7 @@ class PortfolioOrchestrator:
             try:
                 results = scanner.scan_all()
             except Exception as e:  # noqa: BLE001
-                print(f"  [{trader_id}] scan error: {e}", flush=True)
+                logger.error(f"[{trader_id}] scan error: {e}")
                 continue
             all_results.extend(results)
             for r in results:

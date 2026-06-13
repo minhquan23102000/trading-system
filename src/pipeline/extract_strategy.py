@@ -16,6 +16,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+from model_trader.logging import logger
+
 
 EXTRACTION_INSTRUCTIONS = """# Strategy Extraction Instructions
 
@@ -64,10 +66,10 @@ def main() -> None:
 
     txt_files = sorted(transcripts_dir.glob("*.txt"))
     if not txt_files:
-        print(f"No .txt files found in {transcripts_dir}")
+        logger.error(f"No .txt files found in {transcripts_dir}")
         sys.exit(1)
 
-    print(f"Loading {len(txt_files)} transcripts...")
+    logger.info(f"Loading {len(txt_files)} transcripts...")
     parts: list[str] = [EXTRACTION_INSTRUCTIONS, "---\n"]
     for f in txt_files:
         parts.append(f"## {f.stem}\n\n{f.read_text(encoding='utf-8')}\n")
@@ -75,7 +77,7 @@ def main() -> None:
 
     out_path = output_dir / "_extraction_context.md"
     out_path.write_text(corpus, encoding="utf-8")
-    print(f"  -> {out_path} ({len(corpus):,} chars)")
+    logger.info(f"  -> {out_path} ({len(corpus):,} chars)")
     print()
     print("Next: ask your AI assistant to process this file:")
     print(f'  "Read {out_path} and follow the extraction instructions inside.')

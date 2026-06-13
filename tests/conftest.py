@@ -4,6 +4,17 @@ from __future__ import annotations
 
 import pytest
 
+from model_trader.logging import logger
+
+
+@pytest.fixture(autouse=True)
+def _suppress_logging():
+    """Silence loguru output during tests."""
+    logger.remove()
+    handler_id = logger.add(lambda _msg: None)
+    yield
+    logger.remove(handler_id)
+
 
 def _candle(ts: int, o: float, h: float, l: float, c: float, v: float = 1000) -> dict:
     return {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": v}

@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timezone
 
 from ..gates import SetupStatus
+from ..logging import logger
 from ..trading import (
     PaperTrader,
     is_duplicate_setup,
@@ -97,20 +98,19 @@ def run_monitor(
         invalidated_distance_pct: Price distance (%) required for re-engagement.
         title: Header shown in dashboard.
     """
-    print()
-    print("=" * 60)
-    print(f"  {title}")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(f"  {title}")
     if portfolio:
         n_sym = sum(len(s.symbols) for s in portfolio.scanners.values())
-        print(f"  Scanning {n_sym} symbols across {len(portfolio.scanners)} traders every {scan_interval}s")
+        logger.info(f"  Scanning {n_sym} symbols across {len(portfolio.scanners)} traders every {scan_interval}s")
     else:
-        print(f"  Scanning {len(scanner.symbols)} symbols every {scan_interval}s")
+        logger.info(f"  Scanning {len(scanner.symbols)} symbols every {scan_interval}s")
     mode = "Portfolio" if portfolio else ("Ensemble" if ensemble else "Single-scanner")
-    print(f"  Mode: {mode}")
-    print("  Press Ctrl+C to stop")
-    print("=" * 60)
-    print()
-    print("Running first scan...", flush=True)
+    logger.info(f"  Mode: {mode}")
+    logger.info("  Press Ctrl+C to stop")
+    logger.info("=" * 60)
+    logger.info("Running first scan...")
 
     try:
         while True:
@@ -136,12 +136,12 @@ def run_monitor(
                     results = scanner.scan_all()
                     decisions = [r for r in results if r.status == SetupStatus.TAKE]
             except Exception as e:
-                print(f"Scan error: {e}", flush=True)
+                logger.error(f"Scan error: {e}")
                 time.sleep(scan_interval)
                 continue
 
             scan_time = time.time() - t0
-            print(_build_dashboard(results, scan_time, title), flush=True)
+            logger.info("\n" + _build_dashboard(results, scan_time, title))
 
             # Execute valid TAKE decisions
             open_symbols = {t["symbol"] for t in paper_trader.get_open_trades()}
@@ -171,56 +171,54 @@ def run_monitor(
 
                 trade = paper_trader.execute(r)
                 if trade:
-                    print(
+                    logger.success(
                         f"  >> NEW TRADE: [{trade.id}] {trade.symbol} "
                         f"{trade.direction.upper()}  "
                         f"entry={_fmt_price(trade.entry_price)}  "
                         f"sl={_fmt_price(trade.stop_loss)}  "
                         f"tp={_fmt_price(trade.take_profit)}  "
-                        f"risk=${trade.risk_amount:.2f}",
-                        flush=True,
+                        f"risk=${trade.risk_amount:.2f}"
                     )
 
             # Summary
             open_trades = paper_trader.get_open_trades()
             if open_trades:
-                print(f"\n  OPEN ({len(open_trades)})")
+                lines = [f"\n  OPEN ({len(open_trades)})"]
                 for t in open_trades:
-                    print(
+                    lines.append(
                         f"  [{t['id']}] {t['symbol']} {t['direction'].upper()}  "
                         f"entry={_fmt_price(t['entry_price'])}  "
                         f"sl={_fmt_price(t['stop_loss'])}  "
-                        f"tp={_fmt_price(t['take_profit'])}",
-                        flush=True,
+                        f"tp={_fmt_price(t['take_profit'])}"
                     )
+                logger.info("\n".join(lines))
 
             if closed_this_cycle:
-                print(f"\n  CLOSED THIS CYCLE")
+                lines = ["\n  CLOSED THIS CYCLE"]
                 for t in closed_this_cycle:
                     pnl = t.get("pnl", 0)
                     sign = "+" if pnl >= 0 else ""
-                    print(
+                    lines.append(
                         f"  [{t['id']}] {t['symbol']} {t.get('outcome', '?')}  "
-                        f"{sign}${pnl:.2f}  R={t.get('r_multiple', 0):.2f}",
-                        flush=True,
+                        f"{sign}${pnl:.2f}  R={t.get('r_multiple', 0):.2f}"
                     )
+                logger.info("\n".join(lines))
 
             m = calculate_metrics(paper_trader.journal_path)
             if m["total_trades"] > 0:
-                print(
+                logger.info(
                     f"\n  PERF | trades={m['total_trades']}  "
                     f"W/L={m['wins']}/{m['losses']}  "
                     f"WR={m['win_rate']}%  "
                     f"avgR={m['avg_rr']}  "
                     f"PF={m['profit_factor']}  "
                     f"PnL=${m['total_pnl']:.2f}  "
-                    f"maxDD=${m['max_drawdown']:.2f}",
-                    flush=True,
+                    f"maxDD=${m['max_drawdown']:.2f}"
                 )
 
             wait = fast_interval_when_open if open_trades else scan_interval
-            print(f"\nNext scan in {wait}s...\n", flush=True)
+            logger.info(f"\nNext scan in {wait}s...\n")
             time.sleep(wait)
 
     except KeyboardInterrupt:
-        print("\nMonitor stopped.", flush=True)
+        logger.info("\nMonitor stopped.")

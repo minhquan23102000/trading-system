@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ..gates import SetupResult, SetupStatus
+from ..logging import logger
 from .journal import apply_close, load_journal, save_journal, size_with_leverage_cap
 
 
@@ -124,6 +125,10 @@ class PaperTrader:
         trades = self._load()
         trades.append(asdict(trade))
         self._save(trades)
+        logger.info(
+            f"Trade entry: {trade.id} {trade.symbol} {trade.direction} "
+            f"entry={trade.entry_price} sl={trade.stop_loss} tp={trade.take_profit}"
+        )
         return trade
 
     # ---------- Exit ----------
@@ -175,6 +180,12 @@ class PaperTrader:
             elif hit_tp:
                 self._close_trade(t, "TP_HIT", tp)
                 closed.append(t)
+
+            if hit_sl or hit_tp:
+                logger.info(
+                    f"Trade exit: {t['id']} {t['symbol']} {t.get('outcome')} "
+                    f"pnl={t.get('pnl')} r={t.get('r_multiple')}"
+                )
 
         if closed:
             self._save(trades)

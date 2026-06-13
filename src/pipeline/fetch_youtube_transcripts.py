@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from model_trader.logging import logger
+
 
 def _strip_vtt(vtt_content: str) -> str:
     """Parse a VTT captions file into clean running text."""
@@ -62,8 +64,8 @@ def fetch(video_id: str, output_dir: Path) -> Path | None:
 
     vtt_file = output_dir / f"{video_id}.en.vtt"
     if not vtt_file.exists():
-        print(f"  [{video_id}] no captions available")
-        print(result.stderr[-300:] if result.stderr else "")
+        logger.warning(f"[{video_id}] no captions available")
+        logger.warning(result.stderr[-300:] if result.stderr else "")
         return None
 
     text = _strip_vtt(vtt_file.read_text(encoding="utf-8"))
@@ -72,7 +74,7 @@ def fetch(video_id: str, output_dir: Path) -> Path | None:
         f"# Video: https://youtube.com/watch?v={video_id}\n\n{text}",
         encoding="utf-8",
     )
-    print(f"  [{video_id}] {len(text)} chars -> {txt_file.name}")
+    logger.info(f"  [{video_id}] {len(text)} chars -> {txt_file.name}")
     return txt_file
 
 
@@ -84,7 +86,7 @@ def main():
     output_dir = Path(sys.argv[1])
     video_ids = sys.argv[2:]
 
-    print(f"Fetching {len(video_ids)} videos to {output_dir}\n")
+    logger.info(f"Fetching {len(video_ids)} videos to {output_dir}")
     for vid in video_ids:
         fetch(vid, output_dir)
 

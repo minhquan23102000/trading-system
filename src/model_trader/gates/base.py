@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from ..logging import logger
+
 
 class SetupStatus(str, Enum):
     TAKE = "TAKE"
@@ -110,7 +112,7 @@ class ScannerBase(ABC):
                 data[tf] = self.data.fetch_candles(symbol, tf)
             except Exception as e:
                 data[tf] = []
-                print(f"  [fetch warning] {symbol} {tf}: {e}", flush=True)
+                logger.warning(f"[fetch warning] {symbol} {tf}: {e}")
         return data
 
     def fetch_correlation(self, symbol: str, timeframes: list[str]) -> dict:

@@ -1,0 +1,27 @@
+# Portfolio configuration
+#
+# Add or remove traders below. Each entry needs scanner.py + config.yaml in its directory.
+# seed_pf / seed_n: backtest profit-factor and trade count used to initialize the composite
+# score on cold-start (empty journal). Once min_trades (default 10) live closed trades
+# accumulate the seed is ignored and live data takes over.
+# Source: 30d portfolio backtest (portfolio_backtest.py). Do NOT use short README windows
+# (7d/14d) as seeds — small samples inflate PF 2-3x. Re-run backtest after major gate changes.
+
+traders:
+  - name: tradingnotes
+    seed_pf: 4.37   # README: PF=4.37, 13 trades (30d backtest)
+    seed_n: 13
+  - name: znasdaq
+    seed_pf: 2.75   # 30d backtest (31 trades) — more reliable than 7d/14d README windows
+    seed_n: 31
+  - name: mulham
+    seed_pf: 1.80   # README: PF=1.80, 186 trades (52d backtest)
+    seed_n: 186
+
+# Shared account settings (all traders draw from one equity pool)
+paper_trading: true
+paper_balance: 100000.0
+max_leverage: 25
+testnet: true
+scan_interval_seconds: 60
+journal: portfolio_trades.json

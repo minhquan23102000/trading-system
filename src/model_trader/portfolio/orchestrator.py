@@ -55,6 +55,7 @@ class PortfolioOrchestrator:
         max_portfolio_risk_pct: float = 3.0,
         daily_dd_pct: float = 3.0,
         group_caps: dict[str, int] | None = None,
+        seeds: dict[str, dict] | None = None,
     ):
         self.scanners = scanners
         self.trader = trader
@@ -67,6 +68,8 @@ class PortfolioOrchestrator:
         self.max_portfolio_risk_pct = max_portfolio_risk_pct
         self.daily_dd_pct = daily_dd_pct
         self.group_caps = group_caps or {"CRYPTO": 2, "METALS": 1, "INDEX": 1}
+        # seeds: {"trader_id": {"pf": float, "n": int}} — backtest priors for cold-start
+        self.seeds: dict[str, dict] = seeds or {}
         self.last_results: list[SetupResult] = []
 
     def scan_cycle(self) -> list[SetupResult]:
@@ -107,7 +110,9 @@ class PortfolioOrchestrator:
         # Composite scores + risk weights
         composites = {
             tid: composite_from_journal(
-                all_trades, tid, self.window_days, self.min_trades
+                all_trades, tid, self.window_days, self.min_trades,
+                seed_pf=self.seeds.get(tid, {}).get("pf", 0.0),
+                seed_n=self.seeds.get(tid, {}).get("n", 0),
             )
             for tid in self.scanners
         }

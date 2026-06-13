@@ -62,34 +62,43 @@ class HyperliquidAdapter(DataAdapter):
         start_ms = end_ms - (days * 86_400_000)
         return self._fetch_range(symbol, interval, start_ms, end_ms, limit=None)
 
+    def _post_with_retry(self, payload: dict, max_retries: int = 4) -> list:
+        """POST to API_URL, retrying on 429 with exponential backoff."""
+        delay = 1.0
+        for attempt in range(max_retries + 1):
+            resp = self.session.post(API_URL, json=payload, timeout=self.timeout)
+            if resp.status_code == 429:
+                if attempt == max_retries:
+                    resp.raise_for_status()
+                time.sleep(delay)
+                delay *= 2
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        return []  # unreachable
+
     def _fetch_range(
         self,
         symbol: str,
         interval: str,
         start_ms: int,
         end_ms: int,
-        limit: int | None,
+        limit: int | None = None,
     ) -> list[Candle]:
         """Paginate through candleSnapshot (max ~500 per response)."""
         candles: list[Candle] = []
         cursor = start_ms
 
         while cursor < end_ms:
-            resp = self.session.post(
-                API_URL,
-                json={
-                    "type": "candleSnapshot",
-                    "req": {
-                        "coin": symbol,
-                        "interval": interval,
-                        "startTime": cursor,
-                        "endTime": end_ms,
-                    },
+            batch = self._post_with_retry({
+                "type": "candleSnapshot",
+                "req": {
+                    "coin": symbol,
+                    "interval": interval,
+                    "startTime": cursor,
+                    "endTime": end_ms,
                 },
-                timeout=self.timeout,
-            )
-            resp.raise_for_status()
-            batch = resp.json()
+            })
             if not batch:
                 break
 
@@ -106,6 +115,10 @@ class HyperliquidAdapter(DataAdapter):
 
             if limit and len(candles) >= limit:
                 break
+
+            # Courtesy pause between pagination batches — avoids saturating the
+            # public endpoint when fetching many candles for multiple symbols.
+            time.sleep(0.05)
 
         # Deduplicate by timestamp (pagination can overlap)
         seen: set[int] = set()

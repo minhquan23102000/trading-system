@@ -51,6 +51,8 @@ def composite_from_journal(
     trader_id: str,
     window_days: int = 90,
     min_trades: int = 10,
+    seed_pf: float = 0.0,
+    seed_n: int = 0,
 ) -> dict[str, Any]:
     """Compute a composite score for one trader from journal history.
 
@@ -58,6 +60,12 @@ def composite_from_journal(
     the number of closed trades for ``trader_id`` within ``window_days``.
     A stability bonus is applied when both the current and prior window
     have a profit factor above 1.2.
+
+    Cold-start seeding:
+        When live closed trades < ``min_trades``, use ``seed_pf`` / ``seed_n``
+        from the trader's backtest results so weights are informed from day 1.
+        Once ``min_trades`` live trades accumulate the seed is ignored entirely.
+        Pass ``seed_n=0`` (default) to preserve original equal-weight bootstrap.
     """
     now = datetime.now(timezone.utc)
     window_start = now - timedelta(days=window_days)
@@ -82,8 +90,16 @@ def composite_from_journal(
             prior_trades.append(t)
 
     n = len(window_trades)
-    if n == 0:
-        return {"composite": 0.0, "n": 0, "pf": 0.0}
+
+    # Cold-start: not enough live trades yet — use seed if provided
+    if n < min_trades:
+        if seed_pf > 0.0 and seed_n >= min_trades:
+            # Seed qualifies as graduated; no stability bonus (can't verify cross-window)
+            composite = seed_pf * math.log(1 + seed_n)
+            return {"composite": composite, "n": seed_n, "pf": seed_pf}
+        if n == 0:
+            return {"composite": 0.0, "n": 0, "pf": 0.0}
+        # Partial live data, no seed: compute real composite but won't graduate yet
 
     pf = _profit_factor(window_trades)
     prior_pf = _profit_factor(prior_trades)

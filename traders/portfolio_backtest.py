@@ -1,4 +1,7 @@
-"""Walk-forward portfolio backtest across tradingnotes, znasdaq, and mulham.
+"""Walk-forward portfolio backtest.
+
+Reads traders/portfolio.yaml to discover which traders to backtest.
+Add or remove a trader there — no code changes needed.
 
 Run from repo root:
     uv run python traders/portfolio_backtest.py
@@ -12,13 +15,16 @@ Output:
 
 from __future__ import annotations
 
-import importlib.util
 import math
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).parent))  # ensure traders/ is importable
+from utils import load_cfg, load_scanner
 
 from model_trader import HyperliquidAdapter
 from model_trader.backtest import run_backtest
@@ -28,22 +34,6 @@ from model_trader.portfolio.sizing import composite_from_journal, compute_weight
 ROOT = Path(__file__).parent
 DAYS = 30
 STARTING_BALANCE = 10_000.0
-
-
-def _load_scanner(trader_dir: Path):
-    """Load Scanner class from a trader directory without requiring it to be a package."""
-    spec = importlib.util.spec_from_file_location(
-        f"_scanner_{trader_dir.name}",
-        trader_dir / "scanner.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.Scanner
-
-
-def _load_cfg(name: str) -> dict:
-    with open(ROOT / name / "config.yaml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
 
 
 def _sep(title: str = "") -> None:
@@ -68,13 +58,26 @@ def _bt_to_pseudo_journal(bt_trade, trader_id: str) -> dict:
 
 
 def main() -> None:
+    with open(ROOT / "portfolio.yaml", encoding="utf-8") as f:
+        pcfg = yaml.safe_load(f)
+
+    raw_traders = pcfg["traders"]
+    trader_entries = [
+        e if isinstance(e, dict) else {"name": e}
+        for e in raw_traders
+    ]
+    trader_names = [e["name"] for e in trader_entries]
+    seeds = {
+        e["name"]: {"pf": e.get("seed_pf", 0.0), "n": e.get("seed_n", 0)}
+        for e in trader_entries
+    }
     adapter = HyperliquidAdapter()
 
     traders = {
-        "tradingnotes": (_load_scanner(ROOT / "tradingnotes"), _load_cfg("tradingnotes")),
-        "znasdaq": (_load_scanner(ROOT / "znasdaq"), _load_cfg("znasdaq")),
-        "mulham": (_load_scanner(ROOT / "mulham"), _load_cfg("mulham")),
+        name: (load_scanner(ROOT / name), load_cfg(ROOT / name))
+        for name in trader_names
     }
+
 
     # ── 1. Standalone backtests ──────────────────────────────────────────────
     standalone: dict[str, dict] = {}
@@ -109,7 +112,11 @@ def main() -> None:
         ]
 
         composites = {
-            tid: composite_from_journal(pseudo, tid)
+            tid: composite_from_journal(
+                pseudo, tid,
+                seed_pf=seeds.get(tid, {}).get("pf", 0.0),
+                seed_n=seeds.get(tid, {}).get("n", 0),
+            )
             for tid in traders
         }
         weights = compute_weights(composites, base_pct=1.0, min_pct=0.25, max_pct=2.0)
@@ -131,13 +138,19 @@ def main() -> None:
             "ts": entry_ts,
         })
 
-    # ── 3. Print standalone ───────────────────────────────────────────────────
+    # ── 3. Print standalone + seed priors ────────────────────────────────────
     _sep("STANDALONE RESULTS")
     for tid, r in standalone.items():
+        seed = seeds.get(tid, {})
+        seed_str = (
+            f"  seed=PF{seed['pf']:.2f}/n{seed['n']}"
+            if seed.get("n", 0) >= 10 else "  no-seed"
+        )
         print(
             f"  {tid:15} | trades={r['total_trades']:3}  "
             f"WR={r['win_rate']:5.1f}%  PF={r['profit_factor']:5.2f}  "
             f"avgR={r['avg_r']:+.2f}  totalR={r['total_r']:+.2f}"
+            f"{seed_str}"
         )
 
     # ── 4. Portfolio stats ────────────────────────────────────────────────────

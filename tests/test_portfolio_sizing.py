@@ -188,6 +188,48 @@ def test_daily_dd_not_breached():
     assert daily_dd_breached(trades, starting_balance, dd_pct=3.0) is False
 
 
+
+def test_composite_seed_used_on_cold_start():
+    """Empty journal + seed → composite derived from seed, trader graduates."""
+    result = composite_from_journal(
+        [], "znasdaq", min_trades=10, seed_pf=5.65, seed_n=21
+    )
+    import math
+    expected = 5.65 * math.log(1 + 21)
+    assert abs(result["composite"] - expected) < 0.001
+    assert result["n"] == 21        # seed_n returned → trader graduates
+    assert result["pf"] == 5.65
+
+
+def test_composite_seed_ignored_after_graduation():
+    """Once min_trades live trades exist, seed is completely ignored."""
+    trades = [_trade("znasdaq", 50.0) for _ in range(12)]  # 12 wins, n >= 10
+    result = composite_from_journal(
+        trades, "znasdaq", min_trades=10, seed_pf=5.65, seed_n=21
+    )
+    assert result["n"] == 12        # live count, not seed_n
+    assert result["pf"] != 5.65    # live PF, not seed
+
+
+def test_seed_below_min_trades_not_used():
+    """seed_n < min_trades → seed ignored, falls back to zero composite."""
+    result = composite_from_journal(
+        [], "znasdaq", min_trades=10, seed_pf=5.65, seed_n=5
+    )
+    assert result == {"composite": 0.0, "n": 0, "pf": 0.0}
+
+
+def test_cold_start_weights_reflect_seed():
+    """With seeds, day-1 weights should reflect backtest quality, not equal weight."""
+    import math
+    composites = {
+        "znasdaq": composite_from_journal([], "znasdaq", seed_pf=5.65, seed_n=21),
+        "mulham": composite_from_journal([], "mulham", seed_pf=1.80, seed_n=186),
+    }
+    weights = compute_weights(composites, base_pct=1.0, min_trades=10)
+    # znasdaq has higher PF → should get higher weight
+    assert weights["znasdaq"] > weights["mulham"]
+
 def pytest_approx(value, rel=1e-6):
     import pytest
 

@@ -111,7 +111,7 @@ uv run python main.py
 
 The bare `python` / `python -m` commands in `docs/pipeline.md` are stale — always use `uv run`.
 
-`traders/` is gitignored. Trader projects and `trades.json` are local-only.
+Trader projects and `trades.json` are local-only.
 
 ---
 
@@ -124,7 +124,7 @@ FVG, note the discrepancy).
 
 ### Step 1.1: Read all transcripts
 
-If transcripts don't exist yet, fetch them:
+If transcripts don't exist yet, fetch them (make sure to fetch all transcripts for the trader (limit 12 best videos)):
 ```bash
 uv run python -m pipeline.fetch_youtube_transcripts traders/<name>/transcripts VIDEO_ID_1 VIDEO_ID_2 ...
 ```

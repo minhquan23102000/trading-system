@@ -1,0 +1,36 @@
+# znasdaq trader configuration
+#
+# Data source is Hyperliquid (HyperliquidAdapter), which has no native
+# forex/futures feed. The strategy was extracted for XAUUSD (gold) and NQ
+# (Nasdaq futures) with XAGUSD/ES as SMT correlation pairs. The closest
+# tradeable proxies on Hyperliquid's "xyz" builder-deployed index/commodity
+# dex are used instead:
+#   XAUUSD -> xyz:GOLD     (spot gold)
+#   XAGUSD -> xyz:SILVER   (spot silver, gold's correlated metal)
+#   NQ     -> xyz:SP500    (closest available US equity index; no NQ/ES feed)
+#   ES     -> xyz:NVDA     (mega-cap tech proxy correlated with US indices)
+
+symbols:
+  - "xyz:GOLD"
+  - "xyz:SP500"
+
+timeframes:
+  - 5m
+  - 15m
+  - 1h
+  - 4h
+
+correlations:
+  "xyz:GOLD": "xyz:SILVER"
+  "xyz:SP500": "xyz:NVDA"
+
+scan_interval_seconds: 60
+
+# Paper trading
+paper_trading: true
+paper_balance: 100000.0
+per_trade_percent: 1.0
+max_leverage: 25
+
+# Optional agent layer
+agent_enabled: false

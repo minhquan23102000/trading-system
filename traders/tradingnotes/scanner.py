@@ -25,6 +25,11 @@ from model_trader.detectors import (
 class Scanner(ScannerBase):
     """Trading Notes SMC Multi-Timeframe scanner — long and short setups."""
 
+    # Risk:reward cap. Targets farther than this multiple of stop distance are
+    # clipped to entry ± MAX_RR × risk. Calibrated from backtest: 3 of 4 losers
+    # had planned RR > 3.0 (distant 1H swings rarely fill before chop hits stop).
+    MAX_RR = 3.0
+
     def __init__(self, config: dict, data_adapter) -> None:
         super().__init__(config, data_adapter)
         self._swing1h = SwingDetector(lookback=3)
@@ -323,9 +328,11 @@ class Scanner(ScannerBase):
                 result.reason = "No 1H swing high above current price for long target"
                 return result
             swing_highs_1h_above.sort(key=lambda s: s["price"])
-            target = swing_highs_1h_above[0]["price"]
+            raw_target = swing_highs_1h_above[0]["price"]
 
             risk = ob_entry - stop
+            # Cap target at MAX_RR × risk to avoid distant-swing chop-out
+            target = min(raw_target, ob_entry + self.MAX_RR * risk)
             reward = target - ob_entry
 
         else:
@@ -350,9 +357,11 @@ class Scanner(ScannerBase):
                 result.reason = "No 1H swing low below current price for short target"
                 return result
             swing_lows_1h_below.sort(key=lambda s: s["price"], reverse=True)
-            target = swing_lows_1h_below[0]["price"]
+            raw_target = swing_lows_1h_below[0]["price"]
 
             risk = stop - ob_entry
+            # Cap target at MAX_RR × risk
+            target = max(raw_target, ob_entry - self.MAX_RR * risk)
             reward = ob_entry - target
 
         if risk <= 0 or reward <= 0:

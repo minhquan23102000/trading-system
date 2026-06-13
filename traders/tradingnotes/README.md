@@ -31,9 +31,11 @@ Secondary setup (weekly range false breakout) not implemented in v1 — extends 
 
 | Period | Symbols | Trades | Win Rate | Avg R | Profit Factor |
 |--------|---------|--------|----------|-------|---------------|
-| 30 days | BTC/ETH/SOL/BNB | 13 | 69.2% | 0.48 | 2.54 |
+| 30 days | BTC/ETH/SOL/BNB | 13 | **76.9%** | **+0.78** | **4.44** |
 
-Breakdown: BTC 5 (4W/1L), ETH 7 (4W/3L), SOL 1 (1W/0L), BNB 0.
+Breakdown: BTC 5 (4W/1L), ETH 7 (5W/2L), SOL 1 (1W/0L), BNB 0.
+
+By direction: long 10 (8W/2L, PF 4.56), short 3 (2W/1L, PF 4.00).
 
 ## Iteration Log
 
@@ -42,7 +44,8 @@ Breakdown: BTC 5 (4W/1L), ETH 7 (4W/3L), SOL 1 (1W/0L), BNB 0.
 | 1 | Gate 1 relaxed: last 2 highs + 2 lows instead of 4 pairs | Evaluations reaching Gate 2 up 6% → 40% |
 | 2 | Gate 4 tolerance: 0.2% → 0.5% | First trades enabled in 30-day window |
 | 3 | Gate 5 lookback: 15 → 25 5M bars | +1 BTC trade caught |
-| 4 | Short side: mirror all 7 gates for bearish setups | 10 → 13 trades; PF 4.59 → 2.54 (expected: shorts harder to time) |
+| 4 | Short side: mirror all 7 gates for bearish setups | 10 → 13 trades; short PF 0.50 (3 trades, 1W/2L) |
+| 5 | `MAX_RR=3.0` cap on target distance (entry ± 3×risk) | PF 2.54 → **4.44**, WR 69.2% → **76.9%**; short PF 0.50 → 4.00 (3 of 4 losers had planned RR > 3.0) |
 
 ## Data Constraints
 

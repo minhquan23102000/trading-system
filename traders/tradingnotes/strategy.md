@@ -164,7 +164,8 @@ Gate 6: 5M structural shift (CHoCH bullish)
 Gate 7 (FINAL — set levels and take):
   Entry:  Top of the 5M order block (last bearish candle before the impulsive 5M bullish move)
   Stop:   Below the 5M liquidity grab low (the sweep wick low)
-  Target: Previous 1H swing high (first visible buy-side liquidity pool on 1H)
+  Target: Previous 1H swing high (first visible buy-side liquidity pool on 1H),
+          CAPPED at entry + 3×risk to avoid distant-swing chop-out
   Direction: "long" (mirror all gates for short setups)
 ```
 

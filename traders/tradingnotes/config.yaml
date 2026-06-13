@@ -1,0 +1,26 @@
+# tradingnotes trader configuration
+
+symbols:
+  - "BTC"
+  - "ETH"
+  - "SOL"
+  - "BNB"
+
+timeframes:
+  - 5m
+  - 15m
+  - 1h
+  - 1d
+
+correlations: {}
+
+scan_interval_seconds: 60
+
+# Paper trading
+paper_trading: true
+paper_balance: 100000.0
+per_trade_percent: 1.0
+max_leverage: 25
+
+# Optional agent layer
+agent_enabled: false

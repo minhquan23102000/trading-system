@@ -92,7 +92,7 @@ def _run_backtest_single(
 
         # Correlation data
         corr_hist: dict[str, list] = {}
-        corr = config.get("correlations", {}).get(symbol)
+        corr = (config.get("correlations") or {}).get(symbol)
         if corr:
             for tf in config.get("timeframes", []):
                 try:

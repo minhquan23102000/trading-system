@@ -13,9 +13,8 @@ timeframes:
   - 1h
   - 4h
 
-correlations:
-  # TODO: add correlation pairs for SMT divergence if used
-  # "SYMBOL_A": "SYMBOL_B"
+correlations: {}
+  # To enable SMT divergence: "BTC": "ETH"  (fetches ETH candles alongside BTC scans)
 
 scan_interval_seconds: 60
 

@@ -75,9 +75,9 @@ class ScannerBase(ABC):
     def __init__(self, config: dict, data_adapter):
         self.config = config
         self.data = data_adapter
-        self.symbols = config.get("symbols", [])
-        self.timeframes = config.get("timeframes", ["1m", "5m", "15m", "1h", "4h"])
-        self.correlations = config.get("correlations", {})
+        self.symbols = config.get("symbols") or []
+        self.timeframes = config.get("timeframes") or ["1m", "5m", "15m", "1h", "4h"]
+        self.correlations = config.get("correlations") or {}
 
     @abstractmethod
     def evaluate(self, symbol: str) -> SetupResult:

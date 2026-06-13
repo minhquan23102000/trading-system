@@ -38,33 +38,6 @@ It is not a strategy. It is the harness around one.
 
 - **`traders/`** — included examples: `mulham`, `znasdaq`, `tradingnotes`. Your trader projects live here.
 
-## Ensemble mode
-
-Run multiple complete trading strategies with weighted voting. Each scanner is
-a full strategy — same module with different params, or entirely different approaches.
-Configured in YAML — no code changes needed.
-
-```yaml
-# In config.yaml:
-ensemble:
-  threshold: 0.5               # min total weight to execute
-  promotion_min_trades: 10     # before challenger can become champion
-  scanners:
-    - id: "default"
-      type: "champion"
-      weight: 0.5
-      strategy_module: "scanner"   # full strategy module
-      params: {}
-    - id: "loose"
-      type: "challenger"
-      weight: 0.25
-      strategy_module: "scanner"   # same strategy, looser gates
-      params: {"fvg_tolerance": 2.0}
-```
-
-Champion sets entry/stop/target. Challengers vote. Auto-promotion based on
-profit factor tracked in SQLite.
-
 ## Quickstart
 
 ```bash

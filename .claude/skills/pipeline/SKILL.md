@@ -24,6 +24,74 @@ This is the ONLY skill for the extract → implement → backtest → iterate wo
 There is no other authoritative source — the docs have stale bare-`python` commands.
 Everything below is verified against the live `uv run` environment.
 
+## Orchestration Model
+
+Extraction and implementation want different models — splitting them is the
+point of this skill's design. Distilling what a trader *actually does* from hours
+of rambling transcript is judgment-heavy and rewards a large model. Everything
+downstream — scaffold, gate code, backtest loop, one-gate tweaks — is mechanical
+translation against a fixed framework API, which a small fast model does cheaply
+and just as well. Running the whole pipeline on the big model burns tokens on
+work that doesn't need it.
+
+Run this skill as an **orchestrator**: own Phase 1, delegate Phases 2-6.
+
+| Phase | Owner | Model | Why this tier |
+|-------|-------|-------|---------------|
+| 1 Extract | orchestrator (or `analyst`/`architect`) | **opus** | the one irreducibly hard step: intent out of noise |
+| 2 Scaffold | `executor` | haiku/deepseek-v4-pro | a single CLI call |
+| 3 Implement gates | `executor` | **deepseek-v4-pro** | strategy.md → gate code against a known API |
+| 4 Backtest | `executor` | deepseek-v4-pro | run, read the numbers |
+| 5 Iterate | `executor` | deepseek-v4-pro | one-gate-at-a-time loop; escalate on a structural wall |
+| 6 Go live (paper) | `executor` | deepseek-v4-pro | run the monitor |
+
+The expensive model touches each trader once (Phase 1) and again only on
+escalation. The implementer never re-derives the strategy — it executes a
+written contract.
+
+### Handoff contract
+
+Phase 1 is "done" — and only then may you delegate — when these files exist and
+stand on their own, because **the implementer will not read the transcripts**:
+
+- `traders/<name>/strategy.md` — every gate in its **Gates (Draft Pipeline)**
+  section is concrete: exact timeframes (never bare "HTF"), exact thresholds,
+  exact pass/fail conditions. A vague gate becomes ambiguous code becomes a
+  meaningless backtest.
+- `traders/<name>/philosophy_draft.md` — intent reference; cheap to pass along.
+- `traders/<name>/README.md` — trader overview: strategy summary, gate table,
+  backtest results (filled after Phases 4-5), data constraints, commands.
+  Skeleton written in Phase 1; results appended by the orchestrator once the
+  implementer reports back.
+
+### Delegating implementation
+
+Spawn one implementer per trader with a self-contained assignment (trader dirs
+are disjoint, so multiple traders fan out in parallel). It reads the skill +
+docs, not the transcripts:
+
+> **`executor` assignment — build the scanner for trader `<name>`:**
+> 1. Read `.claude/skills/pipeline/SKILL.md` Phases 2-6, `docs/designing-gates.md`,
+>    and `docs/backtest.md`.
+> 2. Implement every gate in `traders/<name>/strategy.md`'s **Gates (Draft
+>    Pipeline)** section, in order, in `traders/<name>/scanner.py`.
+> 3. Scaffold (Phase 2) → `evaluate()` + `evaluate_at()` sharing one `_run_gates`
+>    helper (Phase 3) → backtest (Phase 4) → iterate one gate at a time (Phase 5)
+>    until the Phase 5 stop criteria are met.
+> 4. Report the Phase 4.3 assessment and final stats. Do NOT edit `strategy.md`
+>    or `README.md`. If a gate is unimplementable, `strategy.md` self-contradicts,
+>    or the backtest refuses to clear profit factor ~1.0 after three honest
+>    one-gate tweaks, STOP and report which gate/assumption is the problem —
+>    that's extraction's job, not yours.
+
+### Escalation
+
+A structural wall (a Phase 5 plateau, an unimplementable or self-contradictory
+gate) is the orchestrator's signal to reopen Phase 1 — not the implementer's cue
+to guess. Re-read the relevant transcript, fix the gate's definition in
+`strategy.md`, hand the diff back. The cheap model never invents the trader's
+intent; the expensive model never hand-codes gates.
+
 ## Environment
 
 **This project uses uv, not bare Python.** Every command must be prefixed:
@@ -47,7 +115,7 @@ The bare `python` / `python -m` commands in `docs/pipeline.md` are stale — alw
 
 ---
 
-## Phase 1: Extract Strategy from Transcripts
+## Phase 1: Extract Strategy from Transcripts — orchestrator / opus
 
 The goal is to produce `strategy.md` — a structured document that captures what
 the trader actually does, not what they say they do. Prefer what they DO over
@@ -140,7 +208,7 @@ gates.
 
 ---
 
-## Phase 2: Scaffold the Trader Project
+## Phase 2: Scaffold the Trader Project — implementer (executor)
 
 ```bash
 uv run python -m pipeline.scaffold_trader my_trader
@@ -155,7 +223,7 @@ clobber in-progress work.
 
 ---
 
-## Phase 3: Implement Gates
+## Phase 3: Implement Gates — implementer (executor)
 
 ### Step 3.1: Learn the available detectors
 
@@ -280,7 +348,7 @@ This way you write the gates once. See `docs/backtest.md`.
 
 ---
 
-## Phase 4: Backtest
+## Phase 4: Backtest — implementer (executor)
 
 ### Step 4.1: Run it
 
@@ -314,13 +382,16 @@ Tell the user:
 - Where the biggest leak is (e.g., "5 of 7 losses are shorts during an uptrend week")
 - One concrete suggestion for the next gate tweak
 
+After the implementer reports back, the orchestrator writes the final results
+into `traders/<name>/README.md`: backtest table, iteration log, gate pipeline
+table, data constraints, and commands. This becomes the single reference
+document for anyone revisiting the trader.
+
 ---
 
-## Phase 5: Iterate
+## Phase 5: Iterate — implementer (executor)
 
 The loop: `backtest → read results → identify one issue → tweak ONE gate → re-backtest`.
-
-Never change multiple gates at once — you won't know which change mattered.
 
 ### Common issues and fixes
 
@@ -343,7 +414,7 @@ Stop when:
 
 ---
 
-## Phase 6: Go Live (Paper)
+## Phase 6: Go Live (Paper) — implementer (executor)
 
 ```bash
 cd traders/<name>

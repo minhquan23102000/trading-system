@@ -48,7 +48,7 @@ def fetch(video_id: str, output_dir: Path) -> Path | None:
 
     result = subprocess.run(
         [
-            "python", "-m", "yt_dlp",
+            sys.executable, "-m", "yt_dlp",
             "--write-auto-sub",
             "--sub-lang", "en",
             "--skip-download",

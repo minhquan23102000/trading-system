@@ -103,12 +103,12 @@ class Scanner(ScannerBase):
         return result
 
     def evaluate_at(self, symbol: str, hist: dict, corr_hist: dict, ts: int) -> SetupResult:
-        """Backtest variant: same logic but uses pre-fetched historical data.
+        """Backtest variant: hist is pre-sliced to ts by the runner.
 
-        The backtest runner walks through history chronologically and calls
-        this with slices of `hist` truncated at each step timestamp. Your
-        implementation should mirror evaluate() but read from `hist` instead
-        of calling self.data.fetch_candles().
+        Do NOT re-filter hist by timestamp — the runner already cut it.
+        Mirror evaluate() but read from hist/corr_hist instead of
+        calling self.data.fetch_candles(). Extract a shared _run_gates()
+        method and delegate from both evaluate() and evaluate_at().
 
         See docs/backtest.md for the exact pattern.
         """

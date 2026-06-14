@@ -28,6 +28,7 @@ def main():
         config=config,
         data_adapter=data,
         days=180,
+        evaluate_every_n_bars=3,  # check every 15m; 1H/5M structure doesn't shift bar-by-bar
     )
 
     logger.info(f"Total: {results['total_trades']} trades")

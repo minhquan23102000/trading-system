@@ -58,16 +58,8 @@ class Scanner(ScannerBase):
         return self._run_gates(symbol, data, corr_data, ts)
 
     def evaluate_at(self, symbol: str, hist: dict, corr_hist: dict, ts: int) -> SetupResult:
-        """Backtest variant: slice hist to ts before running gates."""
-        filtered = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in hist.items()
-        }
-        filtered_corr = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in corr_hist.items()
-        }
-        return self._run_gates(symbol, filtered, filtered_corr, ts)
+        """Backtest variant: hist is pre-sliced by the runner; just delegate."""
+        return self._run_gates(symbol, hist, corr_hist, ts)
 
     # ------------------------------------------------------------------
     # Gate pipeline
@@ -191,7 +183,7 @@ class Scanner(ScannerBase):
 
         atr_15m = sum(c["high"] - c["low"] for c in c15m[-14:]) / min(14, len(c15m))
         stop_dist = abs(current_price - stop_price)
-        if atr_15m <= 0 or stop_dist <= 0 or stop_dist > 2 * atr_15m * 14:
+        if atr_15m <= 0 or stop_dist <= 0 or stop_dist > 2 * atr_15m:
             result.reason = "No reasonable structural invalidation (stop too far from ATR)"
             return result
         result.gates_passed.append("PROTECTED_STOP")

@@ -47,6 +47,14 @@ class Scanner(ScannerBase):
         (7,  10),  # NY:     07:00–10:00 EST
     ]
 
+    def __init__(self, config: dict, data_adapter) -> None:
+        super().__init__(config, data_adapter)
+        # Pre-instantiate stateless detectors; avoids per-call allocations.
+        self._fvg = FVGDetector()
+        self._swing = SwingDetector(lookback=3)
+        self._disp = DisplacementDetector(lookback=10, threshold_multiplier=1.5)
+        self._fail_swing = FailureSwingDetector(tolerance_pct=0.3)
+
     def evaluate(self, symbol: str) -> SetupResult:
         ts = int(datetime.now(timezone.utc).timestamp() * 1000)
         data = self.fetch_data(symbol)
@@ -56,16 +64,8 @@ class Scanner(ScannerBase):
     def evaluate_at(
         self, symbol: str, hist: dict, corr_hist: dict, ts: int
     ) -> SetupResult:
-        """Backtest variant: slice hist to ts before running gates."""
-        filtered = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in hist.items()
-        }
-        filtered_corr = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in corr_hist.items()
-        }
-        return self._run_gates(symbol, filtered, filtered_corr, ts=ts)
+        """Backtest variant: hist is pre-sliced by the runner; just delegate."""
+        return self._run_gates(symbol, hist, corr_hist, ts=ts)
 
     # ------------------------------------------------------------------
     # Gate pipeline
@@ -109,7 +109,7 @@ class Scanner(ScannerBase):
             return result
 
         recent_4h = candles_4h[-100:]
-        fvgs_4h = FVGDetector().detect(recent_4h)
+        fvgs_4h = self._fvg.detect(recent_4h)
         update_fvg_states(fvgs_4h, recent_4h)
         live_4h_fvgs = [f for f in fvgs_4h if not f["inversed"]]
 
@@ -126,7 +126,7 @@ class Scanner(ScannerBase):
         # ===== GATE 3: PRICE_POSITION =====
         # Use the most recent 15m swing range to compute fib zones.
         # Discount zone for longs (<=50%); premium zone for shorts (>=50%).
-        swings_15m_full = SwingDetector(lookback=3).detect(candles_15m[-100:])
+        swings_15m_full = self._swing.detect(candles_15m[-100:])
         highs_15m_rng = [s for s in swings_15m_full if s["type"] == "high"]
         lows_15m_rng  = [s for s in swings_15m_full if s["type"] == "low"]
 
@@ -134,8 +134,21 @@ class Scanner(ScannerBase):
             result.reason = "Insufficient 15m swing structure for range"
             return result
 
-        range_high = highs_15m_rng[-1]["price"]
-        range_low  = lows_15m_rng[-1]["price"]
+        # Most recent coherent swing leg = last swing + the prior opposite-type
+        # swing. Taking last high and last low independently produces a synthetic
+        # range (non-contiguous legs); enforce a real bracketing pair.
+        last_swing = swings_15m_full[-1]
+        prior_opp = next(
+            (s for s in reversed(swings_15m_full[:-1]) if s["type"] != last_swing["type"]),
+            None,
+        )
+        if prior_opp is None:
+            result.reason = "No coherent 15m swing leg (missing opposite swing)"
+            return result
+        if last_swing["type"] == "high":
+            range_high, range_low = last_swing["price"], prior_opp["price"]
+        else:
+            range_high, range_low = prior_opp["price"], last_swing["price"]
         range_size = range_high - range_low
 
         if range_size <= 0:
@@ -165,9 +178,7 @@ class Scanner(ScannerBase):
 
         # Displaced: strong move in trade direction on recent 15m
         aligned_dir = "bullish" if direction == "long" else "bearish"
-        disps_15m = DisplacementDetector(
-            lookback=10, threshold_multiplier=1.5
-        ).detect(candles_15m[-60:])
+        disps_15m = self._disp.detect(candles_15m[-60:])
         aligned_disps = [d for d in disps_15m if d["direction"] == aligned_dir]
 
         if not aligned_disps:
@@ -229,16 +240,14 @@ class Scanner(ScannerBase):
         # ===== GATE 6: WEAKNESS_STRENGTH =====
         # Weakness: failure-swing cluster on 15m (swings clustering at one level).
         # Strength: displacement candle in trade direction.
-        swings_15m = SwingDetector(lookback=3).detect(candles_15m[-80:])
-        failure_swings = FailureSwingDetector(tolerance_pct=0.3).detect(swings_15m)
+        swings_15m = self._swing.detect(candles_15m[-80:])
+        failure_swings = self._fail_swing.detect(swings_15m)
 
         if not failure_swings:
             result.reason = "No failure-swing cluster (weakness) on 15m"
             return result
 
-        disps_wide = DisplacementDetector(
-            lookback=10, threshold_multiplier=1.5
-        ).detect(candles_15m[-80:])
+        disps_wide = self._disp.detect(candles_15m[-80:])
         strength_disps = [d for d in disps_wide if d["direction"] == aligned_dir]
 
         if not strength_disps:
@@ -252,7 +261,7 @@ class Scanner(ScannerBase):
         # Find a direction-aligned 15m FVG that price has touched (filled)
         # but not broken through (not inversed).
         recent_15m = candles_15m[-60:]
-        fvgs_15m = FVGDetector().detect(recent_15m)
+        fvgs_15m = self._fvg.detect(recent_15m)
         update_fvg_states(fvgs_15m, recent_15m)
 
         fvg_type = "bullish" if direction == "long" else "bearish"

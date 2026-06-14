@@ -92,6 +92,7 @@ class ScannerBase(ABC):
         """
         ...
 
+
     def scan_all(self) -> list[SetupResult]:
         """Evaluate every symbol in the config."""
         return [self.evaluate(s) for s in self.symbols]

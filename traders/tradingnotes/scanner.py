@@ -390,13 +390,5 @@ class Scanner(ScannerBase):
         return self._run_gates(symbol, data, corr_data)
 
     def evaluate_at(self, symbol: str, hist: dict, corr_hist: dict, ts: int) -> SetupResult:
-        """Backtest variant: slice all candle lists to the current bar timestamp."""
-        filtered = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in hist.items()
-        }
-        filtered_corr = {
-            tf: [c for c in candles if c["timestamp"] <= ts]
-            for tf, candles in corr_hist.items()
-        }
-        return self._run_gates(symbol, filtered, filtered_corr)
+        """Backtest variant: hist is pre-sliced by the runner; just delegate."""
+        return self._run_gates(symbol, hist, corr_hist)

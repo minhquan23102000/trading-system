@@ -179,5 +179,28 @@
       "trader_id": "mulham",
       "risk_pct": 0.9267879420715546
     }
+  },
+  {
+    "id": "03bae9f2",
+    "symbol": "SOL",
+    "direction": "short",
+    "entry_price": 68.286,
+    "stop_loss": 69.281212,
+    "take_profit": 66.29557600000001,
+    "position_size": 925.3236371328194,
+    "risk_amount": 920.893187558223,
+    "rr_ratio": 2.0,
+    "status": "OPEN",
+    "entry_time": "2026-06-14T08:16:20.452685+00:00",
+    "exit_time": null,
+    "exit_price": null,
+    "pnl": null,
+    "r_multiple": null,
+    "outcome": null,
+    "notes": "",
+    "extras": {
+      "trader_id": "mulham",
+      "risk_pct": 0.9267879420715546
+    }
   }
 ]

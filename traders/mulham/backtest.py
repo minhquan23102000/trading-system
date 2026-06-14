@@ -1,16 +1,16 @@
 """Backtest runner for mulham.
 
-Data depth: Hyperliquid's candleSnapshot API has a hard 5,000-candle limit
-per timeframe. At 5m that's ~17 days; at 15m it's ~52 days. We step on 15m
-to maximize lookback. The scanner still uses 5m for the Gate 8 trigger candle
-when available — it just steps forward on 15m bars between evaluations.
+Data: Binance spot klines (BTCUSDT/ETHUSDT/SOLUSDT/AVAXUSDT), wrapped in a
+disk cache (`.cache/`) so repeated runs only fetch the gap since last run.
+Binance has years of history at every configured interval, so the backtest
+can step on 5m (the scanner's Gate 8 trigger timeframe) over 180 days.
 """
 
 
 from pathlib import Path
 import yaml
 
-from model_trader import HyperliquidAdapter
+from model_trader import BinanceAdapter, CachingDataAdapter
 from model_trader.backtest import run_backtest
 from model_trader.logging import logger
 
@@ -22,14 +22,14 @@ def main():
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    data = HyperliquidAdapter()
+    data = CachingDataAdapter(BinanceAdapter(), cache_dir=Path(__file__).parent / ".cache")
 
     results = run_backtest(
         scanner_factory=Scanner,
         config=config,
         data_adapter=data,
-        days=52,
-        step_timeframe="15m",
+        days=180,
+        step_timeframe="5m",
     )
     logger.info(f"Total: {results['total_trades']} trades")
     logger.info(f"W/L: {results['wins']}/{results['losses']} "

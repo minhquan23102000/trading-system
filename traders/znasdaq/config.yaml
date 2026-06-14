@@ -13,8 +13,6 @@
 symbols:
   - "xyz:GOLD"
   - "xyz:SP500"
-  - "xyz:NVDA"
-  - "xyz:SILVER"
 
 timeframes:
   - 5m

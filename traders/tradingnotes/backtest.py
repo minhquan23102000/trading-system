@@ -1,9 +1,15 @@
-"""Backtest runner for tradingnotes."""
+"""Backtest runner for tradingnotes.
+
+Data: Binance spot klines (BTCUSDT/ETHUSDT/SOLUSDT/BNBUSDT), wrapped in a
+disk cache (`.cache/`) so repeated runs only fetch the gap since last run.
+Binance has years of history at every configured interval, so the backtest
+covers 180 days.
+"""
 
 from pathlib import Path
 import yaml
 
-from model_trader import HyperliquidAdapter
+from model_trader import BinanceAdapter, CachingDataAdapter
 from model_trader.backtest import run_backtest
 from model_trader.logging import logger
 
@@ -15,13 +21,13 @@ def main():
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    data = HyperliquidAdapter()
+    data = CachingDataAdapter(BinanceAdapter(), cache_dir=Path(__file__).parent / ".cache")
 
     results = run_backtest(
         scanner_factory=Scanner,
         config=config,
         data_adapter=data,
-        days=30,
+        days=180,
     )
 
     logger.info(f"Total: {results['total_trades']} trades")

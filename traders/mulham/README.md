@@ -4,8 +4,29 @@ HTF key-level + LTF confirmation strategy extracted from 9 YouTube transcripts (
 
 ## Backtest Results
 
-**Period:** 52 days | **Step TF:** 15m | **Data:** Hyperliquid (5,000 candle API limit)
+**Period:** 180 days | **Step TF:** 5m | **Data:** Binance spot klines (`CachingDataAdapter`)
 **Symbols:** BTC, ETH, SOL, AVAX
+
+| Symbol | Trades | W | L | Win Rate | Net R |
+|--------|--------|---|---|----------|-------|
+| BTC | 193 | 59 | 133 | 30.6% | -6.41 |
+| ETH | 140 | 55 | 84 | 39.3% | +27.42 |
+| SOL | 193 | 62 | 131 | 32.1% | -2.54 |
+| AVAX | 160 | 54 | 106 | 33.8% | +4.31 |
+| **Total** | **686** | **230** | **454** | **33.6%** | **+22.78R** |
+
+**Profit factor:** 1.05 | **Avg R/trade:** 0.03 | **~3.8 trades/day**
+
+The 52-day/15m Hyperliquid backtest (below, kept for history) showed PF
+1.80; the 180-day/5m Binance backtest is far larger (686 vs 186 trades) and
+lands near breakeven (PF 1.05). ETH and AVAX remain net positive; BTC and
+SOL are net negative over the wider window. This is the more reliable
+sample for `portfolio.yaml`'s `seed_pf`/`seed_n` going forward — the prior
+1.80/186-trade seed likely overstated edge from a shorter, favorable window.
+Gate re-tuning (the iteration log below was tuned against the 52d sample)
+is the next step before trusting this strategy at the 180d scale.
+
+### Prior result: 52 days / 15m / Hyperliquid (legacy, kept for reference)
 
 | Symbol | Trades | W | L | Win Rate | Net R |
 |--------|--------|---|---|----------|-------|
@@ -48,14 +69,15 @@ benefited most; AVAX flipped to positive win rate.
 | 9 | RR_OK | Stop ≥0.20% of price, target ≥2:1 risk-reward | SKIP |
 | 10 | FINAL | Set entry/stop/target/direction → TAKE | — |
 
-## Data Depth Constraint
+## Data Source & Depth
 
-Hyperliquid's `candleSnapshot` endpoint returns max 5,000 candles per timeframe:
-- 5m: ~17 days | 15m: ~52 days | 1h: ~208 days | 4h: ~833 days
-
-The backtest steps on **15m** to maximize lookback. Gate 8 still uses 5m for
-the trigger candle when available. A local candle cache would remove this limit
-entirely for future runs.
+Backtest uses `BinanceAdapter` (BTC/ETH/SOL/AVAX vs USDT) wrapped in
+`CachingDataAdapter` (`.cache/`, gitignored) — years of native history at
+every configured interval (1m/5m/15m/1h/4h), no retention ceiling like
+Hyperliquid's `candleSnapshot` (5,000-candle cap: 5m≈17d, 15m≈52d). The
+backtest now steps on **5m** over 180 days; Gate 8 uses 5m for the trigger
+candle as before. Live paper trading (`main.py`) still uses
+`HyperliquidAdapter` — unaffected by this change.
 
 ## Commands
 

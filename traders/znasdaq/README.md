@@ -32,30 +32,38 @@ draws.
 
 ## Backtest Results
 
-Data source: Hyperliquid (`xyz:GOLD`, `xyz:SP500`). Live fetch, no
-synthetic data. Two independent windows run on first implementation.
+Data source: Yahoo Finance chart API (`GC=F`→`xyz:GOLD`, `^GSPC`→`xyz:SP500`),
+wrapped in `CachingDataAdapter`. `1h`/`4h` (4h synthesized from 1h) cover the
+full 180d window; `5m`/`15m` only cover the most recent ~60d (gates degrade
+gracefully on the older portion — see `docs/backtest.md`).
 
-| Period | Symbols | Trades | Win Rate | Avg R | Profit Factor |
-|--------|---------|--------|----------|-------|---------------|
-| 7d     | GOLD + SP500 | 19 (15W/3L) | 83.3% | 0.67 | 5.0 |
-| 14d    | GOLD + SP500 | 23 (19W/3L) | 86.4% | 0.73 | 6.33 |
+| Period | Symbols | Trades | Win Rate | Total R | Profit Factor |
+|--------|---------|--------|----------|---------|---------------|
+| 180d (Yahoo) | GOLD + SP500 | 37 (18W/18L) | 50.0% | 0.0 | 1.0 |
+| 7d (Hyperliquid, legacy) | GOLD + SP500 | 19 (15W/3L) | 83.3% | — | 5.0 |
+| 14d (Hyperliquid, legacy) | GOLD + SP500 | 23 (19W/3L) | — | — | 6.33 |
 
-No iteration required — both windows cleared PF > 1.3 on first
-implementation. Main caveat: 18-23 closed trades per window is below
-the 50-trade confidence bar; treat results as directionally strong,
-not statistically final.
+The 180d Yahoo-backed run is the current reference window — far larger
+sample than the original 7d/14d Hyperliquid windows (which used the `xyz:`
+synthetic perp feed directly and are kept above for history). At 1:1R target,
+a 50% WR nets PF≈1.0 — the strategy is breakeven before costs over this
+window vs. the strong-but-tiny-sample 7d/14d results. Needs gate tuning
+(Gate 2 competing-draw threshold, Gate 3 SMT staleness — see Iteration Log)
+before the larger sample is trusted as a seed.
 
 ## Iteration Log
 
-No iterations required. Initial gate logic passed both backtest windows
-comfortably. If live trading surfaces consistent leakage, Gate 3 (SMT
-staleness) and Gate 2 (competing draw threshold 1.2×) are the most
-likely candidates to tune first.
+No iterations required yet on the 180d Yahoo window. Original 7d/14d
+Hyperliquid windows passed with no iteration; the larger sample surfaces a
+50% WR / PF≈1.0 baseline. If live trading or further backtests confirm this,
+Gate 3 (SMT staleness) and Gate 2 (competing draw threshold 1.2×) are the
+most likely candidates to tune first.
 
 ## Data Constraints
 - Requires 4h + 1h + 15m + 5m candles per symbol (min 10 each, 5m min 1)
 - Requires correlated-pair candles for SMT: `xyz:SILVER` for GOLD, `xyz:NVDA` for SP500
-- Symbols must exist on Hyperliquid (native forex/futures feeds absent; xyz dex proxies used)
+- Live paper trading: Hyperliquid `xyz:` dex proxies (native forex/futures feeds absent)
+- Backtest: Yahoo Finance (`GC=F`, `^GSPC`, `SI=F`, `NVDA`) — `4h` synthesized from `1h`; `5m`/`15m` limited to ~60d
 
 ## Commands
 ```bash

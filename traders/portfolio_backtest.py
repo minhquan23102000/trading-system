@@ -26,14 +26,50 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))  # ensure traders/ is importable
 from utils import load_cfg, load_scanner
 
-from model_trader import HyperliquidAdapter
+from model_trader import (
+    BinanceAdapter,
+    CachingDataAdapter,
+    HyperliquidAdapter,
+    YahooFinanceAdapter,
+)
 from model_trader.backtest import run_backtest
 from model_trader.portfolio.sizing import composite_from_journal, compute_weights
 
 
 ROOT = Path(__file__).parent
-DAYS = 30
 STARTING_BALANCE = 10_000.0
+
+# Per-trader data source, lookback window, and step timeframe.
+#
+# mulham/tradingnotes (Binance, crypto): years of native history at every
+# configured interval -> 180d on the scanner's natural step timeframe.
+# znasdaq (Yahoo proxies): 1h/4h cover 180d; 5m/15m only cover the most
+# recent ~60d (gates degrade gracefully on the older portion) -> 180d on 1h.
+_YAHOO_SYMBOL_MAP = {
+    "xyz:GOLD": "GC=F",
+    "xyz:SP500": "^GSPC",
+    "xyz:SILVER": "SI=F",
+    "xyz:NVDA": "NVDA",
+}
+
+
+def _trader_data_config(name: str) -> tuple[object, int, str]:
+    """Return (data_adapter, days, step_timeframe) for a trader."""
+    cache_dir = ROOT / name / ".cache"
+    if name == "znasdaq":
+        return (
+            CachingDataAdapter(YahooFinanceAdapter(symbol_map=_YAHOO_SYMBOL_MAP), cache_dir=cache_dir),
+            180,
+            "1h",
+        )
+    if name in ("mulham", "tradingnotes"):
+        return (
+            CachingDataAdapter(BinanceAdapter(), cache_dir=cache_dir),
+            180,
+            "5m",
+        )
+    # Fallback: legacy Hyperliquid path for any trader not yet migrated.
+    return (HyperliquidAdapter(), 30, "5m")
 
 
 def _sep(title: str = "") -> None:
@@ -71,7 +107,6 @@ def main() -> None:
         e["name"]: {"pf": e.get("seed_pf", 0.0), "n": e.get("seed_n", 0)}
         for e in trader_entries
     }
-    adapter = HyperliquidAdapter()
 
     traders = {
         name: (load_scanner(ROOT / name), load_cfg(ROOT / name))
@@ -84,12 +119,14 @@ def main() -> None:
     all_closed: list[tuple[int, str, object]] = []  # (ts_ms, trader_id, BacktestTrade)
 
     for tid, (Scanner, cfg) in traders.items():
-        _sep(f"{tid.upper()} standalone ({DAYS}d)")
+        data_adapter, days, step_timeframe = _trader_data_config(tid)
+        _sep(f"{tid.upper()} standalone ({days}d)")
         result = run_backtest(
             scanner_factory=Scanner,
             config=cfg,
-            data_adapter=adapter,
-            days=DAYS,
+            data_adapter=data_adapter,
+            days=days,
+            step_timeframe=step_timeframe,
         )
         standalone[tid] = result
         for t in result["trades"]:

@@ -29,13 +29,23 @@ Secondary setup (weekly range false breakout) not implemented in v1 — extends 
 
 ## Backtest Results
 
-| Period | Symbols | Trades | Win Rate | Avg R | Profit Factor |
-|--------|---------|--------|----------|-------|---------------|
-| 30 days | BTC/ETH/SOL/BNB | 13 | **76.9%** | **+0.78** | **4.44** |
+Data source: Binance spot klines (BTC/ETH/SOL/BNB), wrapped in
+`CachingDataAdapter` — years of native history at every configured
+timeframe.
 
-Breakdown: BTC 5 (4W/1L), ETH 7 (5W/2L), SOL 1 (1W/0L), BNB 0.
+| Period | Symbols | Trades | Win Rate | Avg R | Total R | Profit Factor |
+|--------|---------|--------|----------|-------|---------|---------------|
+| 180 days (Binance) | BTC/ETH/SOL/BNB | 196 (112W/84L) | **57.1%** | **+0.64** | **+126.13** | **2.5** |
+| 30 days (Hyperliquid, legacy) | BTC/ETH/SOL/BNB | 13 | 76.9% | +0.78 | — | 4.44 |
 
-By direction: long 10 (8W/2L, PF 4.56), short 3 (2W/1L, PF 4.00).
+Per-symbol (180d): BTC 57 (34W/23L), ETH 54 (32W/22L), SOL 28 (9W/19L), BNB 57 (37W/20L).
+By direction is not broken out for the 180d run; the original 30-day window
+(long 10/13, PF 4.56; short 3/13, PF 4.00) is kept above as a reference but
+is too small a sample to compare directly against the 180d figures. The
+wider sample's PF (2.5) is lower than the 30d window's (4.44) — expected,
+since 30d was a small, possibly favorable sample; 196 trades over 180d is
+the more reliable baseline going forward (use this for `portfolio.yaml`'s
+`seed_pf`/`seed_n`).
 
 ## Iteration Log
 

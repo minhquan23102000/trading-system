@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from .data import DataAdapter, HyperliquidAdapter
+from .data import DataAdapter, HyperliquidAdapter, BinanceAdapter, YahooFinanceAdapter, CachingDataAdapter
 from .detectors import (
     Detector,
     SwingDetector,
@@ -35,6 +35,9 @@ from .ensemble import (
 __all__ = [
     "DataAdapter",
     "HyperliquidAdapter",
+    "BinanceAdapter",
+    "YahooFinanceAdapter",
+    "CachingDataAdapter",
     "ScannerBase",
     "SetupResult",
     "SetupStatus",

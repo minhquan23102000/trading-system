@@ -1,8 +1,11 @@
 # Adding a Data Source
 
-The framework ships with `HyperliquidAdapter` because it works with no API
-key. To trade other markets — Binance, Bybit, CCXT-compatible exchanges,
-brokers, custom feeds — you write a new `DataAdapter` subclass.
+The framework ships with `HyperliquidAdapter` (no API key, public Hyperliquid
+`/info` endpoint), `BinanceAdapter` (public Binance spot klines, years of
+history for crypto), and `YahooFinanceAdapter` (public Yahoo Finance chart
+API, for `xyz:`-style synthetic equity/futures proxies). To trade other
+markets — Bybit, CCXT-compatible exchanges, brokers, custom feeds — you
+write a new `DataAdapter` subclass.
 
 ## The contract
 
@@ -79,9 +82,19 @@ scanner = Scanner(config, data)
 
 ## Things NOT to do
 
-- **Don't cache.** Let the caller cache if they need to. The adapter should
-  be stateless except for config and clients.
-- **Don't transform candles.** No fillNaN, no resampling, no smoothing.
+- **Don't cache in a source adapter.** `HyperliquidAdapter`, `BinanceAdapter`,
+  and `YahooFinanceAdapter` are stateless except for config/clients — they
+  make a fresh request every call. **Wrapper adapters are the exception**:
+  `CachingDataAdapter` (`model_trader.data.cache`) decorates any stateless
+  source adapter and persists `fetch_historical()` results to disk so
+  repeated backtest runs only fetch the gap since the last run. This is the
+  recommended pattern for backtests — wrap, don't reimplement caching inside
+  a source adapter. `fetch_candles()` (the live-trading path) stays a pure
+  passthrough even when wrapped.
+- **Don't transform candles.** No fillNaN, no smoothing, and no resampling
+  across non-contiguous data — `YahooFinanceAdapter`'s `4h` is the one
+  sanctioned exception: it aggregates *contiguous* native `1h` bars (no gap
+  > 1.5h) into real 4h OHLCV bars, never fabricating a bar from missing data.
   The detectors expect raw OHLC. If your source has dirty data, fix the
   source.
 - **Don't return synthetic candles.** If a candle is missing, skip it. Don't

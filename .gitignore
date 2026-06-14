@@ -16,6 +16,7 @@ traders/*/trades.json
 traders/*/ensemble.db
 traders/*/transcripts/
 traders/*/raw/
+traders/*/.cache/
 
 # Secrets
 .env

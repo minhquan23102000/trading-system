@@ -101,7 +101,7 @@ Profit factor: 1.45
 
 For each symbol:
 
-1. Fetch full history for every timeframe in the config
+1. Fetch full history for every timeframe in the config (via `data_adapter.fetch_historical(symbol, tf, days)`)
 2. Walk `step_timeframe` (default 5m) bar by bar starting at index 200
 3. If a trade is open: check the current bar's high/low against SL/TP
 4. If no trade open and not in cooldown: call `evaluate_at(...)`
@@ -151,3 +151,39 @@ A few things to look at, in order of importance:
 - **Trusting tiny samples.** A backtest with 12 trades is one good week
   away from being a backtest with 6 winners. Get to 50+ closed trades
   before treating any number as signal.
+
+
+## Data sources for wide-range backtests
+
+`HyperliquidAdapter`'s `candleSnapshot` caps each response at ~5000
+*most-recent* candles per (coin, interval) — a hard server-side ceiling
+(`5m`≈17d, `15m`≈52d, `1h`≈208d, `4h`≈833d). Data older than the ceiling
+doesn't exist upstream; no cache can recover it.
+
+For multi-month backtests, use a source with longer native retention,
+wrapped in `CachingDataAdapter` so repeated runs only fetch the gap since
+the last run:
+
+```python
+from pathlib import Path
+from model_trader import BinanceAdapter, CachingDataAdapter
+
+data = CachingDataAdapter(BinanceAdapter(), cache_dir=Path(__file__).parent / ".cache")
+results = run_backtest(scanner_factory=Scanner, config=config, data_adapter=data, days=180)
+```
+
+- **Crypto** (`mulham`, `tradingnotes`): `BinanceAdapter` — years of history
+  at every framework timeframe for major pairs.
+- **`xyz:`-proxy equities/futures** (`znasdaq`): `YahooFinanceAdapter` —
+  `1h`/`4h` cover ~730d, but `5m`/`15m`/`30m` only cover ~60d. Gates that
+  check `len(hist[tf]) < N` and bail with "Insufficient candle history"
+  degrade gracefully: the 5m/15m gates simply don't fire for the older
+  portion of a >60d window. `4h` is synthesized from `1h` via
+  session-gap-aware aggregation (see `YahooFinanceAdapter` in
+  `src/model_trader/data/AGENTS.md`) — never resample across a session gap
+  yourself.
+
+Cache files live under `traders/<name>/.cache/` (gitignored), one JSON per
+`(adapter, symbol, timeframe)`. Widening `days` on a later run triggers a
+full re-fetch of the wider window automatically — the cache never silently
+truncates history.

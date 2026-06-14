@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, TypedDict, runtime_checkable
 
 
 def load_journal(path: Path) -> list[dict]:
@@ -97,6 +97,34 @@ def apply_close(
     trade["notes"] = reason
 
 
+class TradeRecord(TypedDict):
+    """Common shape of an executed trade journal entry.
+
+    Shared by `PaperTrader` and `HyperliquidExecutor`. Live executors store
+    additional keys (`entry_oid`, `sl_oid`, `tp_oid`, `fill_time`) directly
+    in the journal, but those are not part of this common contract.
+    """
+
+    id: str
+    symbol: str
+    direction: str
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    position_size: float
+    risk_amount: float
+    rr_ratio: float
+    status: str
+    entry_time: str
+    exit_time: str | None
+    exit_price: float | None
+    pnl: float | None
+    r_multiple: float | None
+    outcome: str | None
+    notes: str
+    extras: dict[str, Any]
+
+
 @runtime_checkable
 class Trader(Protocol):
     """Structural contract shared by `PaperTrader` and live executors.
@@ -108,12 +136,14 @@ class Trader(Protocol):
     call sites.
     """
 
-    def execute(self, setup: Any) -> Any: ...
+    journal_path: Path
 
-    def check_exits(self) -> list[dict]: ...
+    def execute(self, setup: Any) -> TradeRecord | None: ...
 
-    def get_open_trades(self) -> list[dict]: ...
+    def check_exits(self) -> list[TradeRecord]: ...
 
-    def get_all_trades(self) -> list[dict]: ...
+    def get_open_trades(self) -> list[TradeRecord]: ...
+
+    def get_all_trades(self) -> list[TradeRecord]: ...
 
     def get_balance(self) -> float: ...

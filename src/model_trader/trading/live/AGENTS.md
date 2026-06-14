@@ -47,7 +47,7 @@ HyperliquidExecutor(
 
 **Methods:**
 
-- **`execute(setup: dict) -> dict | None`** — Open a trade from a TAKE `SetupResult`. Expects keys: `status`, `symbol`, `direction`, `entry`, `stop`, `target`. Returns the journal entry dict (with `id`, `entry_oid`, `sl_oid`, `tp_oid`, `status`, `fill_time`, etc.) or `None` if rejected.
+- **`execute(setup: dict) -> TradeRecord | None`** — Open a trade from a TAKE `SetupResult`. Expects keys: `status`, `symbol`, `direction`, `entry`, `stop`, `target`. Returns the journal entry dict (with `id`, `entry_oid`, `sl_oid`, `tp_oid`, `status`, `fill_time`, etc.) or `None` if rejected.
   - Validates setup completeness and calculates position size from risk budget via `..journal.size_with_leverage_cap()`.
   - Caps position via `max_leverage` to prevent over-leveraging.
   - Places three orders atomically: entry limit, TP trigger, SL trigger (grouped as `normalTpsl`).
@@ -137,12 +137,9 @@ executor.check_exits()
 Keep a separate `PaperTrader` instance in the same script and feed it the same `SetupResult` objects. This lets you compare paper and live performance side-by-side.
 
 ```python
-paper_trader = PaperTrader(...)
-executor = HyperliquidExecutor(...)
-
 result = scanner.evaluate(symbol)
 if result.status == SetupStatus.TAKE:
-    paper_trader.open_trade(result)
+    paper_trader.execute(result)
     executor.execute(result)
 ```
 

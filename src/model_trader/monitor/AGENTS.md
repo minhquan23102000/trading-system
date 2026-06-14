@@ -25,10 +25,10 @@ The monitor module is the **top of the stack** (see `docs/architecture.md`). It 
 
 The loop follows a strict sequence every `scan_interval` seconds (or `fast_interval_when_open` if a trade is open):
 
-1. **Exit check**: `paper_trader.check_exits()` — close trades that hit TP/SL using 1-minute candles.
+1. **Exit check**: `trader.check_exits()` — close trades that hit TP/SL using 1-minute candles.
 2. **Scan**: Either `ensemble.scan_all()` (multi-scanner mode) or `scanner.scan_all()` (single-scanner mode).
 3. **Dashboard**: Render all results (TAKE, WAIT, SKIP, NO_SETUP) to stdout, with scan time and performance metrics.
-4. **Filter & execute**: For each TAKE result that passes both filters, call `paper_trader.execute()`.
+4. **Filter & execute**: For each TAKE result that passes both filters, call `trader.execute()`.
 5. **Summary**: Print open trades, closed trades this cycle, and rolling performance stats.
 6. **Sleep**: Wait `scan_interval` seconds (or `fast_interval_when_open` if any trade is open).
 
@@ -45,7 +45,7 @@ No unit tests live in `tests/` for the monitor module itself — it is integrati
 ### Common Patterns
 
 - `run_monitor()` runs forever until `KeyboardInterrupt` (Ctrl+C).
-- All parameters are optional except `scanner` and `paper_trader`.
+- All parameters are optional except `scanner` and `trader`.
 - In single-scanner mode, the loop calls `scanner.scan_all()` and filters the results to only TAKE status for execution.
 - In ensemble mode, the loop calls `ensemble.scan_all()` (which internally votes across multiple scanners) and executes the weighted decisions. The dashboard still shows all scanner results from `ensemble._scanners`, not just the final votes.
 - The dashboard uses status prefixes (`>>>` for TAKE, `~` for WAIT, `x` for SKIP, and blank for NO_SETUP) and sorts results by status priority.
@@ -58,7 +58,7 @@ No unit tests live in `tests/` for the monitor module itself — it is integrati
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `scanner` | `ScannerBase` | Your scanner instance (single-scanner mode). Must have `symbols` attribute (list of strings) and `scan_all()` method. |
-| `paper_trader` | `PaperTrader` | Journaled paper trader. Owns position state and the JSON journal (e.g., `traders/<name>/trades.json`). |
+| `trader` | `Trader` | A `Trader`-protocol instance (`PaperTrader` for paper trading, `HyperliquidExecutor` for live). Owns position state and the JSON journal (e.g., `traders/<name>/trades.json`). |
 
 ### Optional
 
@@ -81,7 +81,7 @@ No unit tests live in `tests/` for the monitor module itself — it is integrati
 
 ### Exit Phase
 
-Before scanning, the monitor calls `paper_trader.check_exits()`, which:
+Before scanning, the monitor calls `trader.check_exits()`, which:
 - Fetches 1-minute candles for each open position's symbol.
 - Checks whether price has hit the take-profit or stop-loss level.
 - Closes the trade and returns the closed trade list.
@@ -99,10 +99,10 @@ Both filters query the paper trader's JSON journal to detect whether a similar s
 ### Execution Phase
 
 For each TAKE that passes both filters:
-- Call `paper_trader.execute(setup_result)`, which:
+- Call `trader.execute(setup_result)`, which:
   - Creates a new trade record with the setup's entry/stop/target.
   - Appends it to the journal.
-  - Returns the trade object (or `None` if execution failed).
+  - Returns the trade record (or `None` if execution failed).
 - Print a confirmation message with trade ID, symbol, direction, price levels, and risk amount.
 
 ### Dashboard Phase
@@ -145,7 +145,7 @@ See `docs/ensemble.md` for detailed ensemble design and configuration.
 ## State Management
 
 - **State storage**: All persistent state is owned by `PaperTrader` (JSON journal) and optionally `EnsembleEngine` (SQLite database). The monitor loop itself is stateless—it recomputes all results every scan.
-- **Journal path**: `paper_trader.journal_path` must point to a writable JSON file (typically `traders/<name>/trades.json`).
+- **Journal path**: `trader.journal_path` must point to a writable JSON file (typically `traders/<name>/trades.json`).
 - **Ensemble database**: When using ensemble mode, the engine writes to `traders/<name>/ensemble.db` (SQLite).
 - **Restart safety**: Both files survive restarts. On restart, the loop re-reads the journal and database to recover positions and history.
 

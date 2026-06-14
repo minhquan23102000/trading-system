@@ -29,9 +29,9 @@ import math
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import cast
 
-from ..journal import apply_close, load_journal, save_journal, size_with_leverage_cap
+from ..journal import TradeRecord, apply_close, load_journal, save_journal, size_with_leverage_cap
 
 
 class HyperliquidExecutor:
@@ -157,7 +157,7 @@ class HyperliquidExecutor:
 
     # ---------- Entry ----------
 
-    def execute(self, setup) -> dict | None:
+    def execute(self, setup) -> TradeRecord | None:
         """Open a trade from a TAKE SetupResult or dict. Returns the journal entry or None.
 
         Accepts both a SetupResult object and a plain dict with keys:
@@ -199,6 +199,7 @@ class HyperliquidExecutor:
                 f"No margin in the '{self._dex_for_coin(coin) or 'default'}' "
                 f"dex account. Transfer USDC into it before trading {coin}."
             )
+        pct = setup.get("risk_pct", self.per_trade_pct)
         size, risk = size_with_leverage_cap(balance, pct, entry, stop_dist, self.max_leverage)
 
         size = self._round_size(coin, size)
@@ -276,7 +277,7 @@ class HyperliquidExecutor:
         trades = self._load()
         trades.append(trade)
         self._save(trades)
-        return trade
+        return cast(TradeRecord, trade)
 
     # ---------- Exit reconciliation ----------
 

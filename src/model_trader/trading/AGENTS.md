@@ -20,11 +20,11 @@ from the journal for dashboard and analysis.
 
 | File | Description |
 |------|-------------|
-| `journal.py` | Shared primitives: `load_journal()`/`save_journal()` (JSON persistence), `size_with_leverage_cap()` (risk-based sizing with leverage cap), `apply_close()` (mutates a trade dict into its closed state — pnl, r_multiple, outcome, notes), and the `Trader` `Protocol` (structural contract: `execute`, `check_exits`, `get_open_trades`, `get_all_trades`, `get_balance`) |
+| `journal.py` | Shared primitives: `load_journal()`/`save_journal()` (JSON persistence), `size_with_leverage_cap()` (risk-based sizing with leverage cap), `apply_close()` (mutates a trade dict into its closed state — pnl, r_multiple, outcome, notes), `TradeRecord` `TypedDict` (the common 18-field shape returned by `execute()`), and the `Trader` `Protocol` (structural contract: `execute`, `check_exits`, `get_open_trades`, `get_all_trades`, `get_balance`, `journal_path`) |
 | `paper.py` | `PaperTrader` class and `Trade` dataclass: opens trades via `execute(SetupResult)`, closes on TP/SL via `check_exits()`, stores account state (balance, open/closed trades) |
 | `filters.py` | Two filter functions: `is_duplicate_setup()` (same entry/SL/TP within tolerance recently closed) and `is_invalidated_level()` (stop is near a blown level and price hasn't moved far enough away) |
 | `metrics.py` | `calculate_metrics()` computes W/L count, win rate, avg R-multiple, profit factor, total PnL, max drawdown from closed trades |
-| `__init__.py` | Exports `PaperTrader`, `Trade`, `Trader`, `is_duplicate_setup`, `is_invalidated_level`, `calculate_metrics`, and the `journal` helpers |
+| `__init__.py` | Exports `PaperTrader`, `Trade`, `Trader`, `TradeRecord`, `is_duplicate_setup`, `is_invalidated_level`, `calculate_metrics`, and the `journal` helpers |
 
 ## Subdirectories
 
@@ -48,7 +48,7 @@ from the journal for dashboard and analysis.
   `exit_time` (ISO 8601 or None), `exit_price` (float or None), `pnl` (float or None), `r_multiple` (float or None),
   `outcome` ("WIN"/"LOSS"/"BE" or None), `notes` (e.g., "SL_HIT", "TP_HIT"), `extras` (dict of scanner-supplied fields).
 - `PaperTrader.execute(setup: SetupResult)` opens a trade: validates setup status and prices, sizes via
-  `journal.size_with_leverage_cap(balance, pct, entry, stop_dist, max_leverage)`, writes to journal. Returns `Trade | None`.
+  `journal.size_with_leverage_cap(balance, pct, entry, stop_dist, max_leverage)`, writes to journal. Returns `TradeRecord | None` — the journaled dict with all 18 typed fields. `Trade` dataclass is now an internal construction helper.
 - `PaperTrader.check_exits()` fetches the latest 1m candle for each open trade, checks candle high/low against
   SL and TP. If SL hit, closes with "SL_HIT" via `journal.apply_close()`; if TP hit, closes with "TP_HIT". Computes PnL and R-multiple.
   Returns list of newly-closed trades.

@@ -17,12 +17,13 @@ HyperliquidExecutor`.
 from .paper import PaperTrader, Trade
 from .filters import is_duplicate_setup, is_invalidated_level
 from .metrics import calculate_metrics
-from .journal import Trader, apply_close, load_journal, save_journal, size_with_leverage_cap
+from .journal import Trader, TradeRecord, apply_close, load_journal, save_journal, size_with_leverage_cap
 
 __all__ = [
     "PaperTrader",
     "Trade",
     "Trader",
+    "TradeRecord",
     "is_duplicate_setup",
     "is_invalidated_level",
     "calculate_metrics",

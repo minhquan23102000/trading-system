@@ -86,7 +86,7 @@ def main() -> None:
     title = "Portfolio Monitor  [" + " + ".join(trader_names) + "]"
     run_monitor(
         scanner=None,
-        paper_trader=trader,
+        trader=trader,
         portfolio=orch,
         scan_interval=scan_interval,
         title=title,

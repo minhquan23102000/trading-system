@@ -28,7 +28,7 @@ def main():
 
     run_monitor(
         scanner=scanner,
-        paper_trader=paper,
+        trader=paper,
         scan_interval=config.get("scan_interval_seconds", 60),
         title="tradingnotes Live Monitor",
     )

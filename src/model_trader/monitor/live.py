@@ -3,7 +3,7 @@
 Scans symbols, shows a dashboard, opens paper trades on TAKE signals.
 Supports single-scanner mode (default) and ensemble voting mode.
 
-Call `run_monitor(scanner, paper_trader, ensemble=None)` to start.
+Call `run_monitor(scanner, trader, ensemble=None)` to start.
 """
 
 
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from ..gates import SetupStatus
 from ..logging import logger
 from ..trading import (
-    PaperTrader,
+    Trader,
     is_duplicate_setup,
     is_invalidated_level,
     calculate_metrics,
@@ -73,7 +73,7 @@ def _build_dashboard(results: list, scan_time: float, title: str) -> str:
 
 def run_monitor(
     scanner,
-    paper_trader: PaperTrader,
+    trader: Trader,
     ensemble=None,
     portfolio=None,
     scan_interval: int = 60,
@@ -87,7 +87,7 @@ def run_monitor(
 
     Args:
         scanner: Your ScannerBase subclass instance (single-scanner mode).
-        paper_trader: A PaperTrader instance (journal path + balance config).
+        trader: A `Trader`-protocol instance — `PaperTrader` or a live executor.
         ensemble: Optional EnsembleEngine instance for multi-scanner voting.
         portfolio: Optional PortfolioOrchestrator instance. When set, scanner
             must be None. Takes precedence over ensemble.
@@ -117,7 +117,7 @@ def run_monitor(
             t0 = time.time()
 
             # Close any hit stops/targets on open trades
-            closed_this_cycle = paper_trader.check_exits()
+            closed_this_cycle = trader.check_exits()
 
             # Evaluate setups: ensemble mode or single-scanner mode
             try:
@@ -144,7 +144,7 @@ def run_monitor(
             logger.info("\n" + _build_dashboard(results, scan_time, title))
 
             # Execute valid TAKE decisions
-            open_symbols = {t["symbol"] for t in paper_trader.get_open_trades()}
+            open_symbols = {t["symbol"] for t in trader.get_open_trades()}
             for r in decisions:
                 if r.symbol in open_symbols:
                     continue
@@ -153,7 +153,7 @@ def run_monitor(
 
                 # Filter: duplicate
                 if is_duplicate_setup(
-                    paper_trader.journal_path,
+                    trader.journal_path,
                     r.symbol, r.entry, r.stop, r.target,
                     lookback_minutes=duplicate_lookback_min,
                 ):
@@ -161,7 +161,7 @@ def run_monitor(
 
                 # Filter: invalidated level
                 if is_invalidated_level(
-                    paper_trader.journal_path,
+                    trader.journal_path,
                     r.symbol, r.direction, r.stop,
                     current_price=r.entry,
                     max_age_hours=invalidated_level_hours,
@@ -169,19 +169,19 @@ def run_monitor(
                 ):
                     continue
 
-                trade = paper_trader.execute(r)
+                trade = trader.execute(r)
                 if trade:
                     logger.success(
-                        f"  >> NEW TRADE: [{trade.id}] {trade.symbol} "
-                        f"{trade.direction.upper()}  "
-                        f"entry={_fmt_price(trade.entry_price)}  "
-                        f"sl={_fmt_price(trade.stop_loss)}  "
-                        f"tp={_fmt_price(trade.take_profit)}  "
-                        f"risk=${trade.risk_amount:.2f}"
+                        f"  >> NEW TRADE: [{trade['id']}] {trade['symbol']} "
+                        f"{trade['direction'].upper()}  "
+                        f"entry={_fmt_price(trade['entry_price'])}  "
+                        f"sl={_fmt_price(trade['stop_loss'])}  "
+                        f"tp={_fmt_price(trade['take_profit'])}  "
+                        f"risk=${trade['risk_amount']:.2f}"
                     )
 
             # Summary
-            open_trades = paper_trader.get_open_trades()
+            open_trades = trader.get_open_trades()
             if open_trades:
                 lines = [f"\n  OPEN ({len(open_trades)})"]
                 for t in open_trades:
@@ -204,7 +204,7 @@ def run_monitor(
                     )
                 logger.info("\n".join(lines))
 
-            m = calculate_metrics(paper_trader.journal_path)
+            m = calculate_metrics(trader.journal_path)
             if m["total_trades"] > 0:
                 logger.info(
                     f"\n  PERF | trades={m['total_trades']}  "

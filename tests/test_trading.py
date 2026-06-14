@@ -175,15 +175,15 @@ def test_execute_opens_and_persists_trade(journal_path):
     trade = trader.execute(_take_setup())
 
     assert trade is not None
-    assert trade.status == "OPEN"
-    assert trade.rr_ratio == pytest.approx(2.0)  # (110-100)/(100-95)
+    assert trade["status"] == "OPEN"
+    assert trade["rr_ratio"] == pytest.approx(2.0)  # (110-100)/(100-95)
     # 1% of 100k / stop_dist(5) = 200 units
-    assert trade.position_size == pytest.approx(200.0)
-    assert trade.risk_amount == pytest.approx(1_000.0)
+    assert trade["position_size"] == pytest.approx(200.0)
+    assert trade["risk_amount"] == pytest.approx(1_000.0)
 
     persisted = json.loads(journal_path.read_text())
     assert len(persisted) == 1
-    assert persisted[0]["id"] == trade.id
+    assert persisted[0]["id"] == trade["id"]
     assert trader.get_open_trades() == persisted
 
 
@@ -191,8 +191,8 @@ def test_execute_uses_extras_risk_pct_override(journal_path):
     trader = PaperTrader(journal_path, starting_balance=100_000, per_trade_pct=1.0)
     setup = _take_setup(extras={"risk_pct": 2.0})
     trade = trader.execute(setup)
-    assert trade.risk_amount == pytest.approx(2_000.0)
-    assert trade.position_size == pytest.approx(400.0)
+    assert trade["risk_amount"] == pytest.approx(2_000.0)
+    assert trade["position_size"] == pytest.approx(400.0)
 
 
 def test_check_exits_no_data_adapter_returns_empty(journal_path):
@@ -396,11 +396,16 @@ def test_paper_trader_satisfies_trader_protocol(journal_path):
 
 
 def test_hyperliquid_executor_satisfies_trader_protocol():
+    from pathlib import Path
+
     from model_trader.trading.live import HyperliquidExecutor
 
     # Avoid network calls in __init__: check structural conformance on a
     # bare instance (Protocol isinstance only inspects attribute presence).
+    # journal_path is normally set in __init__; set it here so the
+    # data-attribute check in the runtime_checkable Protocol passes.
     bare = HyperliquidExecutor.__new__(HyperliquidExecutor)
+    bare.journal_path = Path("unused.json")
     assert isinstance(bare, Trader)
 
 
@@ -408,7 +413,7 @@ def test_trading_package_exports():
     import model_trader.trading as trading
 
     for name in (
-        "PaperTrader", "Trade", "Trader",
+        "PaperTrader", "Trade", "Trader", "TradeRecord",
         "is_duplicate_setup", "is_invalidated_level", "calculate_metrics",
         "apply_close", "load_journal", "save_journal", "size_with_leverage_cap",
     ):
@@ -422,3 +427,5 @@ def test_top_level_package_exports_paper_trader_and_trader():
     assert mt.Trader is not None
     assert "PaperTrader" in mt.__all__
     assert "Trader" in mt.__all__
+    assert mt.TradeRecord is not None
+    assert "TradeRecord" in mt.__all__

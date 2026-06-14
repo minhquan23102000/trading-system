@@ -11,11 +11,11 @@ import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..gates import SetupResult, SetupStatus
 from ..logging import logger
-from .journal import apply_close, load_journal, save_journal, size_with_leverage_cap
+from .journal import TradeRecord, apply_close, load_journal, save_journal, size_with_leverage_cap
 
 
 @dataclass
@@ -86,7 +86,7 @@ class PaperTrader:
 
     # ---------- Entry ----------
 
-    def execute(self, setup: SetupResult) -> Trade | None:
+    def execute(self, setup: SetupResult) -> TradeRecord | None:
         """Open a paper trade from a TAKE SetupResult. Returns None if invalid."""
         if setup.status != SetupStatus.TAKE:
             return None
@@ -129,7 +129,7 @@ class PaperTrader:
             f"Trade entry: {trade.id} {trade.symbol} {trade.direction} "
             f"entry={trade.entry_price} sl={trade.stop_loss} tp={trade.take_profit}"
         )
-        return trade
+        return cast(TradeRecord, asdict(trade))
 
     # ---------- Exit ----------
 

@@ -35,6 +35,19 @@ class BacktestTrade:
     exit_reason: str = ""
 
 
+def _cost_in_r(entry: float, stop: float, cost_bps: float) -> float:
+    """Round-trip transaction cost (fees+slippage+spread) expressed in R units.
+
+    cost_bps is the ROUND-TRIP cost as basis points of notional. Per-unit risk
+    is |entry - stop|; per-unit cost in price terms is entry * cost_bps/1e4.
+    Cost in R = cost_price / risk. Returns 0.0 when risk or cost is non-positive
+    (defensive: scanners already guard risk > 0).
+    """
+    risk = abs(entry - stop)
+    if risk <= 0 or cost_bps <= 0:
+        return 0.0
+    return (entry * cost_bps / 1e4) / risk
+
 def run_backtest(
     scanner_factory: Callable[..., Any],
     config: dict,
@@ -78,6 +91,7 @@ def _run_backtest_single(
     step_timeframe, cooldown_bars, evaluate_every_n_bars,
 ) -> dict:
     scanner = scanner_factory(config, data_adapter)
+    cost_bps = float(config.get("backtest_cost_bps", 0.0))
     all_trades: list[BacktestTrade] = []
     per_symbol: dict[str, dict] = {}
 
@@ -119,7 +133,7 @@ def _run_backtest_single(
                 if open_trade.direction == "long":
                     if candle["low"] <= open_trade.stop:
                         open_trade.outcome = "LOSS"
-                        open_trade.pnl_r = -1.0
+                        open_trade.pnl_r = round(-1.0 - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2)
                         open_trade.exit_reason = "SL"
                         trades_for_symbol.append(open_trade)
                         open_trade = None
@@ -128,7 +142,8 @@ def _run_backtest_single(
                         open_trade.outcome = "WIN"
                         open_trade.pnl_r = round(
                             abs(open_trade.target - open_trade.entry) /
-                            abs(open_trade.entry - open_trade.stop), 2
+                            abs(open_trade.entry - open_trade.stop)
+                            - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2
                         )
                         open_trade.exit_reason = "TP"
                         trades_for_symbol.append(open_trade)
@@ -137,7 +152,7 @@ def _run_backtest_single(
                 else:
                     if candle["high"] >= open_trade.stop:
                         open_trade.outcome = "LOSS"
-                        open_trade.pnl_r = -1.0
+                        open_trade.pnl_r = round(-1.0 - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2)
                         open_trade.exit_reason = "SL"
                         trades_for_symbol.append(open_trade)
                         open_trade = None
@@ -146,7 +161,8 @@ def _run_backtest_single(
                         open_trade.outcome = "WIN"
                         open_trade.pnl_r = round(
                             abs(open_trade.entry - open_trade.target) /
-                            abs(open_trade.entry - open_trade.stop), 2
+                            abs(open_trade.entry - open_trade.stop)
+                            - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2
                         )
                         open_trade.exit_reason = "TP"
                         trades_for_symbol.append(open_trade)
@@ -235,6 +251,7 @@ def _run_backtest_ensemble(
         scanners.append(scanner)
 
     engine = EnsembleEngine(ensemble_cfg, db, scanners)
+    cost_bps = float(config.get("backtest_cost_bps", 0.0))
 
     all_trades: list[BacktestTrade] = []
     per_symbol: dict[str, dict] = {}
@@ -275,7 +292,7 @@ def _run_backtest_ensemble(
                 if open_trade.direction == "long":
                     if candle["low"] <= open_trade.stop:
                         open_trade.outcome = "LOSS"
-                        open_trade.pnl_r = -1.0
+                        open_trade.pnl_r = round(-1.0 - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2)
                         open_trade.exit_reason = "SL"
                         trades_for_symbol.append(open_trade)
                         open_trade = None
@@ -284,7 +301,8 @@ def _run_backtest_ensemble(
                         open_trade.outcome = "WIN"
                         open_trade.pnl_r = round(
                             abs(open_trade.target - open_trade.entry) /
-                            abs(open_trade.entry - open_trade.stop), 2
+                            abs(open_trade.entry - open_trade.stop)
+                            - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2
                         )
                         open_trade.exit_reason = "TP"
                         trades_for_symbol.append(open_trade)
@@ -293,7 +311,7 @@ def _run_backtest_ensemble(
                 else:
                     if candle["high"] >= open_trade.stop:
                         open_trade.outcome = "LOSS"
-                        open_trade.pnl_r = -1.0
+                        open_trade.pnl_r = round(-1.0 - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2)
                         open_trade.exit_reason = "SL"
                         trades_for_symbol.append(open_trade)
                         open_trade = None
@@ -302,7 +320,8 @@ def _run_backtest_ensemble(
                         open_trade.outcome = "WIN"
                         open_trade.pnl_r = round(
                             abs(open_trade.entry - open_trade.target) /
-                            abs(open_trade.entry - open_trade.stop), 2
+                            abs(open_trade.entry - open_trade.stop)
+                            - _cost_in_r(open_trade.entry, open_trade.stop, cost_bps), 2
                         )
                         open_trade.exit_reason = "TP"
                         trades_for_symbol.append(open_trade)

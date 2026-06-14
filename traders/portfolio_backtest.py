@@ -38,6 +38,7 @@ from model_trader.portfolio.sizing import composite_from_journal, compute_weight
 
 ROOT = Path(__file__).parent
 STARTING_BALANCE = 10_000.0
+OOS_FRACTION = 0.30  # last 30% of each trader's trade timeline = out-of-sample
 
 # Per-trader data source, lookback window, and step timeframe.
 #
@@ -91,6 +92,42 @@ def _bt_to_pseudo_journal(bt_trade, trader_id: str) -> dict:
         ).isoformat(),
         "extras": {"trader_id": trader_id},
     }
+
+
+def _seg_metrics(trades) -> dict:
+    """PF/WR/avgR for a list of BacktestTrades (closed only). Outcome-based PF,
+    matching runner.py's definition."""
+    closed = [t for t in trades if t.outcome in ("WIN", "LOSS")]
+    if not closed:
+        return {"n": 0, "wr": 0.0, "pf": 0.0, "avg_r": 0.0, "total_r": 0.0}
+    wins = [t for t in closed if t.outcome == "WIN"]
+    win_pnl = sum(t.pnl_r for t in wins)
+    loss_pnl = abs(sum(t.pnl_r for t in closed if t.outcome == "LOSS"))
+    total_r = sum(t.pnl_r for t in closed)
+    return {
+        "n": len(closed),
+        "wr": len(wins) / len(closed) * 100,
+        "pf": (win_pnl / loss_pnl) if loss_pnl > 0 else float("inf"),
+        "avg_r": total_r / len(closed),
+        "total_r": total_r,
+    }
+
+
+def _split_is_oos(trades, oos_frac: float = OOS_FRACTION):
+    """Split closed trades by TIME into (in_sample, out_of_sample, cutoff_ts).
+    Cutoff = min_ts + (max_ts - min_ts) * (1 - oos_frac) over this trader's own
+    trade timeline. Returns (is_metrics, oos_metrics, cutoff_ts | None)."""
+    closed = [t for t in trades if t.outcome in ("WIN", "LOSS")]
+    if len(closed) < 2:
+        return _seg_metrics(closed), _seg_metrics([]), None
+    ts = sorted(t.timestamp for t in closed)
+    lo, hi = ts[0], ts[-1]
+    cutoff = lo + (hi - lo) * (1 - oos_frac)
+    return (
+        _seg_metrics([t for t in closed if t.timestamp < cutoff]),
+        _seg_metrics([t for t in closed if t.timestamp >= cutoff]),
+        cutoff,
+    )
 
 
 def main() -> None:
@@ -190,6 +227,19 @@ def main() -> None:
             f"{seed_str}"
         )
 
+
+    _sep("IN-SAMPLE / OUT-OF-SAMPLE  (OOS = last 30% of each trader's timeline)")
+    for tid, r in standalone.items():
+        is_m, oos_m, cutoff = _split_is_oos(r["trades"])
+        cut = (
+            datetime.fromtimestamp(cutoff / 1000, tz=timezone.utc).date().isoformat()
+            if cutoff else "n/a"
+        )
+        print(f"  {tid:15} | OOS cutoff={cut}")
+        print(f"    IS : n={is_m['n']:3}  WR={is_m['wr']:5.1f}%  "
+              f"PF={is_m['pf']:5.2f}  avgR={is_m['avg_r']:+.2f}")
+        print(f"    OOS: n={oos_m['n']:3}  WR={oos_m['wr']:5.1f}%  "
+              f"PF={oos_m['pf']:5.2f}  avgR={oos_m['avg_r']:+.2f}")
     # ── 4. Portfolio stats ────────────────────────────────────────────────────
     if not portfolio_trades:
         print("\nNo closed portfolio trades.")

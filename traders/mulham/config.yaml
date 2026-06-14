@@ -17,6 +17,8 @@ correlations: {}
   # To enable SMT divergence: "BTC": "ETH"  (fetches ETH candles alongside BTC scans)
 
 scan_interval_seconds: 60
+# Backtest round-trip cost (fees+slippage+spread) in basis points of notional
+backtest_cost_bps: 10
 
 # Paper trading
 paper_trading: true

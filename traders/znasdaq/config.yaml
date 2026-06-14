@@ -25,6 +25,8 @@ correlations:
   "xyz:SP500": "xyz:NVDA"
 
 scan_interval_seconds: 60
+# Backtest round-trip cost (fees+slippage+spread) in basis points of notional
+backtest_cost_bps: 5
 
 # Paper trading
 paper_trading: true

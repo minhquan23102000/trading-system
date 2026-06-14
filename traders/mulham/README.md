@@ -1,42 +1,68 @@
 # Mulham Trading Scanner
 
-HTF key-level + LTF confirmation strategy extracted from 9 YouTube transcripts (~5 hours of video) and implemented as a 10-gate scanner.
+HTF key-level + LTF confirmation strategy extracted from 9 YouTube transcripts (~5 hours of video)
+and implemented as a 10-gate scanner.
 
 ## Backtest Results
 
-**Period:** 180 days | **Step TF:** 5m | **Data:** Binance spot klines (`CachingDataAdapter`)
-**Symbols:** BTC, ETH, SOL, AVAX
+### Cost-adjusted baseline (current)
 
-| Symbol | Trades | W | L | Win Rate | Net R |
-|--------|--------|---|---|----------|-------|
-| BTC | 193 | 59 | 133 | 30.6% | -6.41 |
+**Period:** 180d | **Step TF:** 5m | **Data:** Binance spot (`CachingDataAdapter`) | **Cost model:** 10bps round-trip
+
+| Symbol | Trades | W | L | Win Rate |
+|--------|--------|---|---|----------|
+| BTC | 193 | 59 | 133 | 30.6% |
+| ETH | 140 | 55 | 84 | 39.3% |
+| SOL | 193 | 62 | 131 | 32.1% |
+| AVAX | 160 | 54 | 106 | 33.8% |
+| **Total** | **686** | **230** | **454** | **33.6%** |
+
+**Profit factor:** 0.79 | **Avg R/trade:** −0.17 | **Total R:** −114.59 | **~3.8 trades/day**
+
+> **Why costs matter so much here:** gate 9 enforces a 0.20% minimum stop distance.
+> At 10bps round-trip, `_cost_in_r(entry, 0.20%-stop) = 0.5R` — half a full R wiped per trade
+> just in friction. A strategy operating near 33% WR needs costs near zero to survive.
+
+### IS / OOS split (70% / 30% time)
+
+| Segment | Cutoff | n | WR | PF | avgR |
+|---------|--------|---|----|----|------|
+| In-sample | — | 478 | 32.2% | 0.74 | −0.21 |
+| Out-of-sample | 2026-04-21 | 206 | 36.9% | 0.92 | −0.06 |
+
+OOS is marginally less negative than IS — not evidence of edge, but no cliff either.
+Both halves are sub-1.0 PF after cost.
+
+### Frictionless baseline (superseded — kept for reference only)
+
+| Symbol | Trades | W | L | Win Rate | Net R (no cost) |
+|--------|--------|---|---|----------|-----------------|
+| BTC | 193 | 59 | 133 | 30.6% | −6.41 |
 | ETH | 140 | 55 | 84 | 39.3% | +27.42 |
-| SOL | 193 | 62 | 131 | 32.1% | -2.54 |
+| SOL | 193 | 62 | 131 | 32.1% | −2.54 |
 | AVAX | 160 | 54 | 106 | 33.8% | +4.31 |
-| **Total** | **686** | **230** | **454** | **33.6%** | **+22.78R** |
+| **Total** | **686** | **230** | **454** | **33.6%** | **+22.78** |
 
-**Profit factor:** 1.05 | **Avg R/trade:** 0.03 | **~3.8 trades/day**
+**Frictionless PF:** 1.05 | **Frictionless avgR:** +0.03
 
-The 52-day/15m Hyperliquid backtest (below, kept for history) showed PF
-1.80; the 180-day/5m Binance backtest is far larger (686 vs 186 trades) and
-lands near breakeven (PF 1.05). ETH and AVAX remain net positive; BTC and
-SOL are net negative over the wider window. This is the more reliable
-sample for `portfolio.yaml`'s `seed_pf`/`seed_n` going forward — the prior
-1.80/186-trade seed likely overstated edge from a shorter, favorable window.
-Gate re-tuning (the iteration log below was tuned against the 52d sample)
-is the next step before trusting this strategy at the 180d scale.
+The frictionless read was near-breakeven already. The 0.5R/trade floor cost converts
+that thin positive edge into consistent loss.
 
-### Prior result: 52 days / 15m / Hyperliquid (legacy, kept for reference)
+### Prior result: 52d / 15m / Hyperliquid (legacy — different data source and timeframe)
 
-| Symbol | Trades | W | L | Win Rate | Net R |
-|--------|--------|---|---|----------|-------|
+| Symbol | Trades | W | L | Win Rate | Net R (no cost) |
+|--------|--------|---|---|----------|-----------------|
 | AVAX | 41 | 21 | 20 | 51.2% | +24.9 |
 | SOL | 53 | 23 | 30 | 43.4% | +19.6 |
 | BTC | 48 | 22 | 26 | 45.8% | +18.0 |
 | ETH | 44 | 20 | 23 | 46.5% | +17.0 |
-| **Total** | **186** | **86** | **99** | **46.5%** | **+79.5R** |
+| **Total** | **186** | **86** | **99** | **46.5%** | **+79.5** |
 
-**Profit factor:** 1.80 | **Avg R/trade:** 0.43 | **~3.6 trades/day**
+**Frictionless PF:** 1.80 | **Frictionless avgR:** +0.43
+
+This window's 46.5% WR vs 33.6% on the 180d run is a major discrepancy — the shorter
+window caught a favorable regime or the Hyperliquid feed and 15m step interact differently
+with the gates. Do not use this as a seed prior.
 
 ### Iteration Log
 
@@ -48,11 +74,15 @@ is the next step before trusting this strategy at the 180d scale.
 | 2 | 9 | Stop-distance floor: none → 0.15% | 1.74 | 45.5% | +76.6 |
 | **3** | **9** | **Stop floor: 0.15% → 0.20%** | **1.80** | **46.5%** | **+79.5** |
 
-Iteration 1 unlocked the pipeline — the strategy's own stated minimum is 50% fill;
-the tighter OTE zone was filtering out valid setups. Iterations 2-3 added a
-minimum stop-distance filter (0.20% of entry price) that removes noise-width FVG
-setups where the gap is narrower than normal volatility spread. ETH and BTC
-benefited most; AVAX flipped to positive win rate.
+All iterations above were run on the **52d / 15m / Hyperliquid** frictionless window.
+They do not carry over to the current 180d / 5m / Binance cost-adjusted baseline.
+
+## Known Defects
+
+| Defect | Location | Effect |
+|--------|----------|--------|
+| Degenerate range | Gate 4 HP_RANGE | `range_high`/`range_low` drawn from latest swing high and latest swing low independently — they need not form a coherent pair, producing a range that has no relationship to the actual displaced HP structure |
+| 0.20% stop floor vs 10bps cost | Gate 9 + cost model | At the floor, cost = 0.5R/trade; the floor was calibrated frictionlessly on the 52d window |
 
 ## Gate Pipeline
 
@@ -72,12 +102,9 @@ benefited most; AVAX flipped to positive win rate.
 ## Data Source & Depth
 
 Backtest uses `BinanceAdapter` (BTC/ETH/SOL/AVAX vs USDT) wrapped in
-`CachingDataAdapter` (`.cache/`, gitignored) — years of native history at
-every configured interval (1m/5m/15m/1h/4h), no retention ceiling like
-Hyperliquid's `candleSnapshot` (5,000-candle cap: 5m≈17d, 15m≈52d). The
-backtest now steps on **5m** over 180 days; Gate 8 uses 5m for the trigger
-candle as before. Live paper trading (`main.py`) still uses
-`HyperliquidAdapter` — unaffected by this change.
+`CachingDataAdapter` (`.cache/`, gitignored) — years of native history at every
+configured interval (1m/5m/15m/1h/4h). Live paper trading (`main.py`) uses
+`HyperliquidAdapter` — unaffected by backtest changes.
 
 ## Commands
 
@@ -96,7 +123,7 @@ cd traders/mulham && uv run python main.py
 | `strategy.md` | Full strategy extraction — 4 setups, 10 gates, key concepts |
 | `philosophy_draft.md` | First-person reference in Mulham's voice |
 | `scanner.py` | Gate implementation (imports framework detectors) |
-| `config.yaml` | Symbols, timeframes, paper trading settings |
+| `config.yaml` | Symbols, timeframes, cost model, paper trading settings |
 | `backtest.py` | Backtest entry point |
 | `main.py` | Live monitor entry point |
 | `transcripts/` | Source YouTube transcripts (9 videos) |

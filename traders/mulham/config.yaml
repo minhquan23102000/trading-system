@@ -20,6 +20,10 @@ scan_interval_seconds: 60
 # Backtest round-trip cost (fees+slippage+spread) in basis points of notional
 backtest_cost_bps: 10
 
+# Gate 9 target model: "swing2r" (nearest 15m swing >=2R, else fixed 2R) or
+# "htf_level" (next HTF 4H key level beyond entry, fallback fixed 2R).
+target_model: "htf_level"
+
 # Paper trading
 paper_trading: true
 paper_balance: 100000.0

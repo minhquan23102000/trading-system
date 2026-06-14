@@ -319,7 +319,11 @@ class Scanner(ScannerBase):
 
         # ===== GATE 9: RR_OK =====
         # Stop just outside the FVG boundary (0.1% buffer).
-        # Target: nearest structural swing beyond entry if ≥2R; else fixed 2R.
+        # Target model: "swing2r" (nearest structural swing beyond entry if
+        # >=2R, else fixed 2R) or "htf_level" (next HTF 4H key level beyond
+        # entry, fallback fixed 2R). Both fall back to fixed 2R when no
+        # qualifying level exists, isolating the target choice from entries.
+        target_model = self.config.get("target_model", "swing2r")
         highs_15m = [s for s in swings_15m if s["type"] == "high"]
         lows_15m  = [s for s in swings_15m if s["type"] == "low"]
 
@@ -327,27 +331,37 @@ class Scanner(ScannerBase):
             stop = nearest_entry_fvg["low"] * (1 - 0.001)
             risk = entry_price - stop
             target = entry_price + risk * 2.0
-            struct_highs = sorted(
-                [s for s in highs_15m if s["price"] > entry_price],
-                key=lambda s: s["price"],
-            )
-            if struct_highs:
-                candidate = struct_highs[0]["price"]
-                if (candidate - entry_price) >= risk * 2.0:
-                    target = candidate
+            if target_model == "htf_level":
+                cands = [f for f in live_4h_fvgs if f["low"] > entry_price]
+                if cands:
+                    target = min(c["low"] for c in cands)
+            else:
+                struct_highs = sorted(
+                    [s for s in highs_15m if s["price"] > entry_price],
+                    key=lambda s: s["price"],
+                )
+                if struct_highs:
+                    candidate = struct_highs[0]["price"]
+                    if (candidate - entry_price) >= risk * 2.0:
+                        target = candidate
         else:
             stop = nearest_entry_fvg["high"] * (1 + 0.001)
             risk = stop - entry_price
             target = entry_price - risk * 2.0
-            struct_lows = sorted(
-                [s for s in lows_15m if s["price"] < entry_price],
-                key=lambda s: s["price"],
-                reverse=True,
-            )
-            if struct_lows:
-                candidate = struct_lows[0]["price"]
-                if (entry_price - candidate) >= risk * 2.0:
-                    target = candidate
+            if target_model == "htf_level":
+                cands = [f for f in live_4h_fvgs if f["high"] < entry_price]
+                if cands:
+                    target = max(c["high"] for c in cands)
+            else:
+                struct_lows = sorted(
+                    [s for s in lows_15m if s["price"] < entry_price],
+                    key=lambda s: s["price"],
+                    reverse=True,
+                )
+                if struct_lows:
+                    candidate = struct_lows[0]["price"]
+                    if (entry_price - candidate) >= risk * 2.0:
+                        target = candidate
 
         if risk <= 0:
             result.reason = "Zero or negative risk (stop == entry)"

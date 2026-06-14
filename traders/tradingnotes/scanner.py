@@ -14,12 +14,17 @@ Both long and short setups are active. See strategy.md for the full gate spec.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from model_trader.gates import ScannerBase, SetupResult, SetupStatus
 from model_trader.detectors import (
     SwingDetector,
     FVGDetector,
     update_fvg_states,
 )
+
+_NY = ZoneInfo("America/New_York")
 
 
 class Scanner(ScannerBase):
@@ -50,6 +55,17 @@ class Scanner(ScannerBase):
             result.reason = "Insufficient 1H history (need 20+ candles)"
             return result
 
+        # ===== Session filter (optional) =====
+        # London (03:00-05:00 ET) or NY (09:30-11:30 ET) killzones only.
+        if self.config.get("session_filter", False):
+            ts = candles_1h[-1]["timestamp"]
+            ny_time = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).astimezone(_NY).time()
+            in_london = (ny_time.hour == 3 or ny_time.hour == 4)
+            in_ny = (ny_time.hour == 9 and ny_time.minute >= 30) or ny_time.hour == 10
+            if not (in_london or in_ny):
+                result.reason = f"Outside session killzone (NY time {ny_time.strftime('%H:%M')})"
+                return result
+
         swings_1h = self._swing1h.detect(candles_1h)
         if len(swings_1h) < 4:
             result.reason = f"Not enough 1H swings ({len(swings_1h)}), need 4+ for structure"
@@ -78,6 +94,11 @@ class Scanner(ScannerBase):
 
         direction = "long" if is_bullish else "short"
         result.extras["direction"] = direction
+
+        direction_filter = self.config.get("direction_filter")
+        if direction_filter and direction_filter != direction:
+            result.reason = f"Direction {direction} excluded by direction_filter={direction_filter!r}"
+            return result
 
         # Both directions are now handled; fall through to Gate 2.
 
@@ -368,6 +389,14 @@ class Scanner(ScannerBase):
             result.reason = (
                 f"Invalid levels — entry={ob_entry:.2f} stop={stop:.2f} "
                 f"target={target:.2f} (risk={risk:.4f} reward={reward:.4f})"
+            )
+            return result
+
+        min_stop_pct = self.config.get("min_stop_pct", 0.0)
+        if min_stop_pct > 0 and risk / ob_entry < min_stop_pct:
+            result.reason = (
+                f"Stop distance {risk/ob_entry*100:.3f}% below min_stop_pct "
+                f"{min_stop_pct*100:.3f}%"
             )
             return result
 

@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import math
 import sys
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +28,12 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))  # ensure traders/ is importable
 from utils import load_cfg, load_scanner
+from diagnostics import (
+    print_funnel,
+    print_stop_histogram,
+    print_direction_breakdown,
+    print_symbol_breakdown,
+)
 
 from model_trader import (
     BinanceAdapter,
@@ -240,6 +249,14 @@ def main() -> None:
               f"PF={is_m['pf']:5.2f}  avgR={is_m['avg_r']:+.2f}")
         print(f"    OOS: n={oos_m['n']:3}  WR={oos_m['wr']:5.1f}%  "
               f"PF={oos_m['pf']:5.2f}  avgR={oos_m['avg_r']:+.2f}")
+
+    _sep("PER-TRADER DIAGNOSTICS")
+    for tid, r in standalone.items():
+        print(f"--- {tid} ---")
+        print_funnel(r)
+        print_stop_histogram(r["trades"])
+        print_direction_breakdown(r["trades"])
+        print_symbol_breakdown(r["trades"])
     # ── 4. Portfolio stats ────────────────────────────────────────────────────
     if not portfolio_trades:
         print("\nNo closed portfolio trades.")

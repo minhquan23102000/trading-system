@@ -18,6 +18,17 @@ scan_interval_seconds: 60
 # Backtest round-trip cost (fees+slippage+spread) in basis points of notional
 backtest_cost_bps: 10
 
+# Experiment toggles (Step C diagnostics) — all default to current behavior.
+# min_stop_pct: reject setups whose stop distance is below this fraction of
+#   entry (0.0 = disabled).
+# direction_filter: restrict to "long" or "short" only (null = both).
+# session_filter: when true, only allow setups whose timestamp (converted to
+#   America/New_York) falls in the London (03:00-05:00) or NY (09:30-11:30)
+#   killzones.
+min_stop_pct: 0.003
+direction_filter: null
+session_filter: false
+
 # Paper trading
 paper_trading: true
 paper_balance: 100000.0

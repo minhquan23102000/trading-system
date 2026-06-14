@@ -116,7 +116,7 @@ def _check_exit(
     return False, 0
 
 
-def _aggregate(all_trades: list[BacktestTrade], per_symbol: dict) -> dict:
+def _aggregate(all_trades: list[BacktestTrade], per_symbol: dict, funnel: Counter | None = None) -> dict:
     """Build the standard results dict from a flat trade list."""
     closed = [t for t in all_trades if t.outcome in ("WIN", "LOSS")]
     wins   = [t for t in closed if t.outcome == "WIN"]
@@ -134,6 +134,7 @@ def _aggregate(all_trades: list[BacktestTrade], per_symbol: dict) -> dict:
         "avg_r":         round(total_r / len(closed), 2) if closed else 0,
         "profit_factor": round(win_pnl / loss_pnl, 2) if loss_pnl > 0 else float("inf"),
         "per_symbol":    per_symbol,
+        "gate_funnel":   dict(funnel) if funnel is not None else {},
         "trades":        all_trades,
     }
 
@@ -193,6 +194,7 @@ def _run_backtest_single(
     timeframes = config.get("timeframes", ["1m", "5m", "15m", "1h", "4h"])
     all_trades: list[BacktestTrade] = []
     per_symbol: dict[str, dict] = {}
+    funnel: Counter = Counter()
 
     for symbol in config.get("symbols", []):
         hist = _fetch_data(data_adapter, symbol, timeframes, days)
@@ -250,6 +252,8 @@ def _run_backtest_single(
                     "See docs/backtest.md."
                 )
 
+            funnel[result.reason or result.status.name] += 1
+
             if result.status == SetupStatus.TAKE and result.entry and result.stop:
                 open_trade = BacktestTrade(
                     timestamp=ts,
@@ -275,7 +279,7 @@ def _run_backtest_single(
         }
         logger.info(f"{symbol}: {len(trades_for_symbol)} trades (W={wins} L={losses})")
 
-    return _aggregate(all_trades, per_symbol)
+    return _aggregate(all_trades, per_symbol, funnel)
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +309,7 @@ def _run_backtest_ensemble(
     all_trades: list[BacktestTrade] = []
     per_symbol: dict[str, dict]     = {}
     per_scanner: dict[str, list]    = {s._scanner_id: [] for s in scanners}
+    funnel: Counter = Counter()
 
     for symbol in config.get("symbols", []):
         hist = _fetch_data(data_adapter, symbol, timeframes, days, warn=False)
@@ -353,6 +358,7 @@ def _run_backtest_ensemble(
             for s in scanners:
                 try:
                     r = s.evaluate_at(symbol, hist_at, corr_at, ts)
+                    funnel[r.reason or r.status.name] += 1
                     if r and r.status == SetupStatus.TAKE:
                         r.extras["scanner_id"] = s._scanner_id
                         all_results.append(r)
@@ -396,7 +402,7 @@ def _run_backtest_ensemble(
 
     db.close()
 
-    result = _aggregate(all_trades, per_symbol)
+    result = _aggregate(all_trades, per_symbol, funnel)
     result["per_scanner"] = {
         sid: {
             "trades":  len(ts),
